@@ -43,7 +43,7 @@ def test_pdt_blocks_when_counter_zero() -> None:
     )
     sim = Simulator(
         provider_config=cfg,
-        config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("0")),
+        config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("100")),
     )
     t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
     sim.account_state.day_trades_remaining = 0

@@ -71,7 +71,7 @@ def test_simulator_honors_settlement_days() -> None:
         slippage_params={"adverse_bps": "0"},
         settlement_days=1,
     )
-    sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("0")))
+    sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("100")))
 
     t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
     # seed a long position to sell
@@ -88,5 +88,5 @@ def test_simulator_honors_settlement_days() -> None:
     result = sim.run(orders, bars)
     assert len(result.fills) == 1
     # unsettled proceeds reflected in equity immediately (cash + unsettled)
-    assert result.portfolio_history[0] == Decimal("10")
-    assert result.portfolio_history[1] == Decimal("10")
+    assert result.portfolio_history[0] == Decimal("110")
+    assert result.portfolio_history[1] == Decimal("110")

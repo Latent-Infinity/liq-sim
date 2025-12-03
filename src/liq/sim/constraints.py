@@ -47,9 +47,19 @@ def check_short_permission(
     order: OrderRequest,
     portfolio: PortfolioState,
     short_enabled: bool,
+    locate_required: bool = False,
 ) -> None:
     """Prevent creation of new shorts when not permitted."""
     if short_enabled:
+        if locate_required and str(order.side).lower().endswith("sell"):
+            pre_pos = portfolio.positions.get(order.symbol)
+            pre_qty = getattr(pre_pos, "quantity", Decimal("0")) if pre_pos else Decimal("0")
+            would_be_short = pre_qty - order.quantity < 0
+            if would_be_short:
+                metadata = getattr(order, "metadata", None) or {}
+                locate_ok = bool(metadata.get("locate_available") or metadata.get("locate_borrowed"))
+                if not locate_ok:
+                    raise ConstraintViolation("Locate required for short selling")
         return
     side_val = str(order.side).lower()
     if side_val.endswith("sell"):

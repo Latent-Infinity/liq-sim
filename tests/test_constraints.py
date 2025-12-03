@@ -9,6 +9,7 @@ from liq.sim.constraints import (
     check_buying_power,
     check_margin,
     check_pdt,
+    check_short_permission,
     check_position_limit,
 )
 from liq.types import PortfolioState
@@ -83,3 +84,46 @@ def test_pdt_rejects_when_exhausted() -> None:
     portfolio = make_portfolio(Decimal("1000"), day_trades_remaining=0)
     with pytest.raises(ConstraintViolation):
         check_pdt(portfolio, is_day_trade=True)
+
+
+def test_short_rejects_when_shorting_disallowed() -> None:
+    portfolio = make_portfolio(Decimal("1000"))
+    # attempt to short 1 share from flat
+    order = OrderRequest(
+        client_order_id=uuid4(),
+        symbol="AAPL",
+        side="sell",
+        order_type=OrderType.MARKET,
+        quantity=Decimal("1"),
+        timestamp=portfolio.timestamp,
+    )
+    with pytest.raises(ConstraintViolation):
+        check_short_permission(order, portfolio, short_enabled=False)
+
+
+def test_short_requires_locate_when_configured() -> None:
+    portfolio = make_portfolio(Decimal("1000"))
+    order = OrderRequest(
+        client_order_id=uuid4(),
+        symbol="AAPL",
+        side="sell",
+        order_type=OrderType.MARKET,
+        quantity=Decimal("1"),
+        timestamp=portfolio.timestamp,
+    )
+    with pytest.raises(ConstraintViolation):
+        check_short_permission(order, portfolio, short_enabled=True, locate_required=True)
+
+
+def test_short_allows_when_locate_provided() -> None:
+    portfolio = make_portfolio(Decimal("1000"))
+    order = OrderRequest(
+        client_order_id=uuid4(),
+        symbol="AAPL",
+        side="sell",
+        order_type=OrderType.MARKET,
+        quantity=Decimal("1"),
+        timestamp=portfolio.timestamp,
+        metadata={"locate_available": True},
+    )
+    check_short_permission(order, portfolio, short_enabled=True, locate_required=True)

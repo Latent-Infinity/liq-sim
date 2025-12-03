@@ -19,6 +19,7 @@ from liq.sim.constraints import (
 )
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.execution import match_order
+from liq.sim.fx import convert_to_usd
 from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 from liq.sim.validation import assert_no_lookahead, ensure_order_eligible
 from liq.types import Bar, Fill, OrderRequest
@@ -50,6 +51,7 @@ class Simulator:
         self.slippage_model = slippage_model_from_config(self.provider_config)
         if self.account_state.cash == 0 and self.config.initial_capital:
             self.account_state.cash = self.config.initial_capital
+        self.account_state.account_currency = self.provider_config.account_currency
         # initialize peak/daily to starting equity
         init_equity = self.account_state.cash + self.account_state.unsettled_cash
         self.peak_equity = init_equity
@@ -58,11 +60,25 @@ class Simulator:
             # Simplified PDT counter (3 day trades default)
             self.account_state.day_trades_remaining = 3
 
+    def _mark_in_account_ccy(self, price: Decimal, symbol: str, fx_rates: dict[str, Decimal] | None) -> Decimal:
+        """Convert a mark to account currency when possible."""
+        if fx_rates and self.account_state.account_currency == "USD":
+            pair = symbol.replace("-", "_")
+            if "_" not in pair:
+                return price
+            try:
+                return convert_to_usd(price, pair, fx_rates)
+            except KeyError:
+                return price
+        return price
+
     def run(
         self,
         orders: Sequence[OrderRequest],
         bars: Sequence[Bar],
         min_delay_bars: int | None = None,
+        fx_rates: dict[str, Decimal] | None = None,
+        swap_rates: dict[str, Decimal] | None = None,
     ) -> SimulationResult:
         min_delay = min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
         fills: list[Fill] = []
@@ -85,14 +101,24 @@ class Simulator:
             if self.current_day is None or bar.timestamp.date() != self.current_day.date():
                 # set daily start to current equity snapshot
                 marks = {symbol: bar.open for symbol in self.account_state.positions.keys()}
-                snapshot = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp)
+                snapshot = self.account_state.to_portfolio_state(
+                    marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates
+                )
                 self.daily_start_equity = snapshot.equity
                 self.current_day = bar.timestamp
 
             self.account_state.process_settlement(bar.timestamp)
+            # apply daily swaps if applicable (for providers with financing)
+            if swap_rates:
+                marks_for_swaps = {symbol: bar.close for symbol in self.account_state.positions.keys()}
+                self.account_state.apply_daily_swap(
+                    bar.timestamp, swap_rates=swap_rates, marks=marks_for_swaps, fx_rates=fx_rates
+                )
             # compute equity snapshot at bar open for drawdown/daily loss checks
             marks_open = {symbol: bar.open for symbol in self.account_state.positions.keys()}
-            snapshot_open = self.account_state.to_portfolio_state(marks=marks_open, timestamp=bar.timestamp)
+            snapshot_open = self.account_state.to_portfolio_state(
+                marks=marks_open, timestamp=bar.timestamp, fx_rates=fx_rates
+            )
             current_equity = snapshot_open.equity
             # update peak
             if current_equity > self.peak_equity:
@@ -119,8 +145,9 @@ class Simulator:
                 # constraints: position limit (based on current equity) and PDT placeholder
                 pre_marks = {symbol: bar.open for symbol in self.account_state.positions.keys()}
                 portfolio_snapshot = self.account_state.to_portfolio_state(
-                    marks=pre_marks, timestamp=bar.timestamp
+                    marks=pre_marks, timestamp=bar.timestamp, fx_rates=fx_rates
                 )
+                mark_for_constraints = self._mark_in_account_ccy(bar.open, order.symbol, fx_rates)
                 # Kill-switch: block exposure-increasing (buys) when engaged
                 try:
                     check_kill_switch(self.kill_switch_engaged, order)
@@ -140,19 +167,20 @@ class Simulator:
                         order,
                         portfolio_snapshot,
                         max_position_pct=self.config.max_position_pct,
-                        mark_price=bar.open,
+                        mark_price=mark_for_constraints,
                     )
-                    check_buying_power(order, portfolio_snapshot, mark_price=bar.open)
+                    check_buying_power(order, portfolio_snapshot, mark_price=mark_for_constraints)
                     check_margin(
                         order,
                         portfolio_snapshot,
-                        mark_price=bar.open,
+                        mark_price=mark_for_constraints,
                         initial_margin_rate=self.provider_config.initial_margin_rate,
                     )
                     check_short_permission(
                         order,
                         portfolio_snapshot,
                         short_enabled=self.provider_config.short_enabled,
+                        locate_required=self.provider_config.locate_required,
                     )
                     check_pdt(portfolio_snapshot, is_day_trade=is_day_trade)
                 except Exception:
@@ -179,7 +207,12 @@ class Simulator:
                         self.account_state.day_trades_remaining = max(
                             0, self.account_state.day_trades_remaining - 1
                         )
-                    self.account_state.apply_fill(fill, settlement_days=self.provider_config.settlement_days)
+                    self.account_state.apply_fill(
+                        fill,
+                        settlement_days=self.provider_config.settlement_days,
+                        borrow_rate_annual=self.provider_config.borrow_rate_annual,
+                        fx_rates=fx_rates,
+                    )
                     bracket = create_brackets(fill.price, order)
                     if bracket.stop_loss or bracket.take_profit:
                         self.active_brackets.append(bracket)
@@ -203,7 +236,12 @@ class Simulator:
                     )
                     if fill:
                         fills.append(fill)
-                        self.account_state.apply_fill(fill, settlement_days=self.provider_config.settlement_days)
+                        self.account_state.apply_fill(
+                            fill,
+                            settlement_days=self.provider_config.settlement_days,
+                            borrow_rate_annual=self.provider_config.borrow_rate_annual,
+                            fx_rates=fx_rates,
+                        )
                 else:
                     remaining_brackets.append(bracket)
             self.active_brackets = remaining_brackets
@@ -219,7 +257,7 @@ class Simulator:
             ]
             # record equity (cash + unsettled + mark to bar close for now)
             marks = {symbol: bar.close for symbol in self.account_state.positions.keys()}
-            portfolio = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp)
+            portfolio = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates)
             equity_curve.append(portfolio.equity)
 
         return SimulationResult(fills=fills, portfolio_history=equity_curve)

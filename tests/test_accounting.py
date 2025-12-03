@@ -81,3 +81,20 @@ def test_to_portfolio_state_realized_sum() -> None:
     acct.apply_fill(make_fill("AAPL", "sell", "12", "1", now + timedelta(minutes=1)))
     state = acct.to_portfolio_state(marks={}, timestamp=now)
     assert state.realized_pnl == Decimal("2")
+
+
+def test_fx_conversion_keeps_equity_in_account_currency() -> None:
+    now = datetime.now(timezone.utc)
+    acct = AccountState(cash=Decimal("1000"))
+    fill = make_fill("USD_JPY", "buy", "150", "1", now)
+    acct.apply_fill(fill, fx_rates={"USD_JPY": Decimal("150")})
+    state = acct.to_portfolio_state(
+        marks={"USD_JPY": Decimal("150")},
+        timestamp=now,
+        fx_rates={"USD_JPY": Decimal("150")},
+    )
+    # price 150 JPY converts to 1 USD
+    assert state.cash == Decimal("999")
+    assert state.equity == Decimal("1000")
+    pos = state.positions["USD_JPY"]
+    assert pos.average_price == Decimal("1")

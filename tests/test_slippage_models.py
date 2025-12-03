@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import uuid4
 
 from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
@@ -66,4 +67,12 @@ def test_spread_based_slippage_uses_bar_spread() -> None:
     bar = make_bar("100", "102", "98", "101", "1000")
     order = make_order("1")
     slippage = model.calculate(order, bar)
-    assert slippage == Decimal("4")  # high - low proxy
+    assert slippage == Decimal("2")  # half the spread so buy +2 / sell -2 = full spread width
+
+
+def test_spread_based_slippage_prefers_explicit_spread() -> None:
+    model = SpreadBasedSlippage()
+    bar = SimpleNamespace(spread=Decimal("0.8"), high=Decimal("0"), low=Decimal("0"))
+    order = make_order("1")
+    slippage = model.calculate(order, bar)
+    assert slippage == Decimal("0.4")
