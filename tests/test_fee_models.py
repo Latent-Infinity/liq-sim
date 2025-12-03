@@ -2,7 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from datetime import datetime, timezone
-from liq.sim.models.fee import TieredMakerTakerFee, ZeroCommissionFee
+from liq.sim.models.fee import PerShareFee, TieredMakerTakerFee, ZeroCommissionFee
 from liq.types import OrderRequest
 from liq.types.enums import OrderSide, OrderType, TimeInForce
 
@@ -45,3 +45,10 @@ def test_zero_commission_fee() -> None:
     order = make_order("100", "5", OrderType.MARKET)
     fee = model.calculate(order, fill_price=Decimal("10"), is_maker=False)
     assert fee == Decimal("0")
+
+
+def test_per_share_fee_with_minimum() -> None:
+    model = PerShareFee(per_share=Decimal("0.005"), min_per_order=Decimal("1.00"))
+    order = make_order("100", "50", OrderType.MARKET)
+    fee = model.calculate(order, fill_price=Decimal("10"), is_maker=False)
+    assert fee == Decimal("1.00")

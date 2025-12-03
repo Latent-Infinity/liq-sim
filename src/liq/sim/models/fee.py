@@ -30,3 +30,17 @@ class ZeroCommissionFee(CommissionModel):
 
     def calculate(self, order: OrderRequest, fill_price: Decimal, is_maker: bool) -> Decimal:
         return Decimal("0")
+
+
+class PerShareFee(CommissionModel):
+    """Per-share/per-unit fee with optional minimum."""
+
+    def __init__(self, per_share: Decimal, min_per_order: Decimal | None = None) -> None:
+        self.per_share = per_share
+        self.min_per_order = min_per_order
+
+    def calculate(self, order: OrderRequest, fill_price: Decimal, is_maker: bool) -> Decimal:
+        fee = self.per_share * order.quantity
+        if self.min_per_order is not None:
+            fee = max(fee, self.min_per_order)
+        return fee
