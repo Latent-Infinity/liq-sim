@@ -90,3 +90,45 @@ def test_simulator_honors_settlement_days() -> None:
     # unsettled proceeds reflected in equity immediately (cash + unsettled)
     assert result.portfolio_history[0] == Decimal("110")
     assert result.portfolio_history[1] == Decimal("110")
+
+
+def test_simulator_outputs_equity_curve_with_timestamps() -> None:
+    provider_cfg = ProviderConfig(
+        name="coinbase",
+        asset_classes=["crypto"],
+        fee_model="ZeroCommission",
+        slippage_model="VolumeWeighted",
+        slippage_params={"base_bps": "0", "volume_impact": "0"},
+    )
+    sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0))
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    orders = [make_order(t0, side="buy", qty="1", limit="100")]
+    bars = [
+        make_bar(t0, "100", "105", "99", "102"),
+        make_bar(t0 + timedelta(minutes=1), "102", "106", "101", "103"),
+    ]
+    result = sim.run(orders, bars)
+    assert len(result.equity_curve) == len(bars)
+    assert result.equity_curve[0][0] == bars[0].timestamp
+    assert result.portfolio_states[0].timestamp == bars[0].timestamp
+
+
+def test_fills_include_realized_pnl_on_close() -> None:
+    provider_cfg = ProviderConfig(
+        name="coinbase",
+        asset_classes=["crypto"],
+        fee_model="ZeroCommission",
+        slippage_model="VolumeWeighted",
+        slippage_params={"base_bps": "0", "volume_impact": "0"},
+    )
+    sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0))
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    buy = make_order(t0, side="buy", qty="1", limit="100")
+    sell = make_order(t0 + timedelta(minutes=1), side="sell", qty="1", limit="110")
+    bars = [
+        make_bar(t0, "100", "100", "100", "100"),
+        make_bar(t0 + timedelta(minutes=1), "110", "110", "110", "110"),
+    ]
+    result = sim.run([buy, sell], bars)
+    assert len(result.fills) == 2
+    assert result.fills[-1].realized_pnl == Decimal("10")

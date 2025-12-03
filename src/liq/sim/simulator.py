@@ -24,13 +24,15 @@ from liq.sim.fx import convert_to_usd
 from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.validation import assert_no_lookahead, ensure_order_eligible
-from liq.types import Bar, Fill, OrderRequest
+from liq.types import Bar, Fill, OrderRequest, PortfolioState
 
 
 @dataclass
 class SimulationResult:
     fills: List[Fill]
-    portfolio_history: List[Decimal]  # equity per bar (simplified for now)
+    portfolio_history: List[Decimal]  # equity per bar (legacy alias)
+    equity_curve: List[tuple[datetime, Decimal]]
+    portfolio_states: List[PortfolioState]
 
 
 @dataclass
@@ -116,7 +118,8 @@ class Simulator:
     ) -> SimulationResult:
         min_delay = min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
         fills: list[Fill] = []
-        equity_curve: list[Decimal] = []
+        equity_curve: list[tuple[datetime, Decimal]] = []
+        portfolio_states: list = []
 
         order_queue = list(orders)
         became_eligible: Dict[int, bool] = {id(o): False for o in order_queue}
@@ -169,6 +172,8 @@ class Simulator:
             eligible_orders = []
             for order in order_queue:
                 created_idx = order_origin_index[id(order)]
+                if bar.timestamp < order.timestamp:
+                    continue
                 assert_no_lookahead(order.timestamp, bar.timestamp)
                 if ensure_eligible(created_idx, bar_idx, min_delay):
                     became_eligible[id(order)] = True
@@ -236,17 +241,17 @@ class Simulator:
                 )
                 if fill:
                     executed_orders.append(order)
-                    fills.append(fill)
                     if is_day_trade and self.account_state.day_trades_remaining is not None:
                         self.account_state.day_trades_remaining = max(
                             0, self.account_state.day_trades_remaining - 1
                         )
-                    self.account_state.apply_fill(
+                    realized = self.account_state.apply_fill(
                         fill,
                         settlement_days=self.provider_config.settlement_days,
                         borrow_rate_annual=self.provider_config.borrow_rate_annual,
                         fx_rates=fx_rates,
                     )
+                    fills.append(fill.model_copy(update={"realized_pnl": realized}))
                     bracket = create_brackets(fill.price, order)
                     if bracket.stop_loss or bracket.take_profit:
                         self.active_brackets.append(bracket)
@@ -269,13 +274,13 @@ class Simulator:
                         timestamp=bar.timestamp,
                     )
                     if fill:
-                        fills.append(fill)
-                        self.account_state.apply_fill(
+                        realized = self.account_state.apply_fill(
                             fill,
                             settlement_days=self.provider_config.settlement_days,
                             borrow_rate_annual=self.provider_config.borrow_rate_annual,
                             fx_rates=fx_rates,
                         )
+                        fills.append(fill.model_copy(update={"realized_pnl": realized}))
                 else:
                     remaining_brackets.append(bracket)
             self.active_brackets = remaining_brackets
@@ -292,9 +297,16 @@ class Simulator:
             # record equity (cash + unsettled + mark to bar close for now)
             marks = {symbol: bar.close for symbol in self.account_state.positions.keys()}
             portfolio = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates)
-            equity_curve.append(portfolio.equity)
+            equity_curve.append((bar.timestamp, portfolio.equity))
+            portfolio_states.append(portfolio)
 
-        return SimulationResult(fills=fills, portfolio_history=equity_curve)
+        portfolio_history = [eq for _, eq in equity_curve]
+        return SimulationResult(
+            fills=fills,
+            portfolio_history=portfolio_history,
+            equity_curve=equity_curve,
+            portfolio_states=portfolio_states,
+        )
 
 
 def ensure_eligible(order_idx: int, current_idx: int, min_delay: int) -> bool:
