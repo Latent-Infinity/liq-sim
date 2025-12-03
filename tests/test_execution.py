@@ -98,3 +98,27 @@ def test_stop_limit_not_triggered_returns_none() -> None:
     bar = make_bar("95", "99", "90", "95")
     fill = match_order(order, bar)
     assert fill is None
+
+
+def test_stop_limit_sell_triggers_on_break() -> None:
+    order = make_order(
+        side=OrderSide.SELL, order_type=OrderType.STOP_LIMIT, qty="1", limit="99", stop="100"
+    )
+    bar = make_bar("101", "102", "98", "99")
+    fill = match_order(order, bar)
+    assert fill
+    assert fill.price == Decimal("101")  # gap benefit on open when triggered
+
+
+def test_limit_sell_not_hit_returns_none() -> None:
+    order = make_order(side=OrderSide.SELL, order_type=OrderType.LIMIT, qty="1", limit="110")
+    bar = make_bar("100", "105", "95", "100")
+    assert match_order(order, bar) is None
+
+
+def test_stop_orders_not_triggered_return_none() -> None:
+    buy_stop = make_order(side=OrderSide.BUY, order_type=OrderType.STOP, qty="1", stop="120")
+    sell_stop = make_order(side=OrderSide.SELL, order_type=OrderType.STOP, qty="1", stop="80")
+    bar = make_bar("100", "105", "95", "100")
+    assert match_order(buy_stop, bar) is None
+    assert match_order(sell_stop, bar) is None
