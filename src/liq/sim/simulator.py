@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+import random
 from typing import Dict, List, Sequence
 
 from liq.sim.accounting import AccountState
@@ -21,6 +22,7 @@ from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.execution import match_order
 from liq.sim.fx import convert_to_usd
 from liq.sim.providers import fee_model_from_config, slippage_model_from_config
+from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.validation import assert_no_lookahead, ensure_order_eligible
 from liq.types import Bar, Fill, OrderRequest
 
@@ -52,6 +54,7 @@ class Simulator:
         if self.account_state.cash == 0 and self.config.initial_capital:
             self.account_state.cash = self.config.initial_capital
         self.account_state.account_currency = self.provider_config.account_currency
+        random.seed(self.config.random_seed)
         # initialize peak/daily to starting equity
         init_equity = self.account_state.cash + self.account_state.unsettled_cash
         self.peak_equity = init_equity
@@ -71,6 +74,37 @@ class Simulator:
             except KeyError:
                 return price
         return price
+
+    def to_checkpoint(self, backtest_id: str, config_hash: str) -> SimulationCheckpoint:
+        """Create a checkpoint snapshot of current simulator state."""
+        return create_checkpoint(
+            backtest_id=backtest_id,
+            config_hash=config_hash,
+            provider_config=self.provider_config,
+            simulator_config=self.config,
+            account_state=self.account_state,
+            current_day=self.current_day,
+            peak_equity=self.peak_equity,
+            daily_start_equity=self.daily_start_equity,
+            kill_switch_engaged=self.kill_switch_engaged,
+            active_brackets=self.active_brackets,
+        )
+
+    @classmethod
+    def from_checkpoint(cls, checkpoint: SimulationCheckpoint) -> "Simulator":
+        """Rehydrate a Simulator from a checkpoint."""
+        checkpoint.restore_random_state()
+        sim = cls(
+            provider_config=checkpoint.provider_config,
+            config=checkpoint.simulator_config,
+            account_state=checkpoint.account_state,
+        )
+        sim.current_day = checkpoint.current_day
+        sim.peak_equity = checkpoint.peak_equity
+        sim.daily_start_equity = checkpoint.daily_start_equity
+        sim.kill_switch_engaged = checkpoint.kill_switch_engaged
+        sim.active_brackets = checkpoint.active_brackets
+        return sim
 
     def run(
         self,
