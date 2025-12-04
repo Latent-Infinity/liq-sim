@@ -99,6 +99,7 @@ def test_simulator_outputs_equity_curve_with_timestamps() -> None:
         fee_model="ZeroCommission",
         slippage_model="VolumeWeighted",
         slippage_params={"base_bps": "0", "volume_impact": "0"},
+        short_enabled=True,
     )
     sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0))
     t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
@@ -120,6 +121,7 @@ def test_fills_include_realized_pnl_on_close() -> None:
         fee_model="ZeroCommission",
         slippage_model="VolumeWeighted",
         slippage_params={"base_bps": "0", "volume_impact": "0"},
+        short_enabled=True,
     )
     sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0))
     t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
@@ -132,3 +134,38 @@ def test_fills_include_realized_pnl_on_close() -> None:
     result = sim.run([buy, sell], bars)
     assert len(result.fills) == 2
     assert result.fills[-1].realized_pnl == Decimal("10")
+
+
+def test_final_equity_matches_pnl_long_and_short() -> None:
+    """Ensure final equity reflects both long and short P&L with zero fees."""
+    provider_cfg = ProviderConfig(
+        name="coinbase",
+        asset_classes=["crypto"],
+        fee_model="ZeroCommission",
+        slippage_model="VolumeWeighted",
+        slippage_params={"base_bps": "0", "volume_impact": "0"},
+        short_enabled=True,
+    )
+    sim = Simulator(
+        provider_config=provider_cfg,
+        config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000")),
+    )
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    bars = [
+        make_bar(t0, "100", "101", "99", "100"),  # enter long at 100
+        make_bar(t0 + timedelta(minutes=1), "110", "111", "109", "110"),  # exit long at 110 (+10)
+        make_bar(t0 + timedelta(minutes=2), "110", "111", "109", "110"),  # enter short at 110
+        make_bar(t0 + timedelta(minutes=3), "100", "101", "99", "100"),  # cover short at 100 (+10)
+    ]
+    orders = [
+        make_order(bars[0].timestamp, side="buy", qty="1"),   # long entry
+        make_order(bars[1].timestamp, side="sell", qty="1"),  # long exit
+        make_order(bars[2].timestamp, side="sell", qty="1"),  # short entry
+        make_order(bars[3].timestamp, side="buy", qty="1"),   # short cover
+    ]
+
+    result = sim.run(orders, bars)
+    assert len(result.fills) == 4
+    # Two trades each earn 10 with zero fees/slippage
+    assert result.equity_curve[-1][1] == Decimal("1020")
+    assert result.portfolio_history[-1] == Decimal("1020")
