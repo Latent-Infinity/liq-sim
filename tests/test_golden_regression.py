@@ -3,8 +3,8 @@ from decimal import Decimal
 
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.types import Bar, OrderRequest
-from liq.types.enums import OrderSide, OrderType, TimeInForce
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_bar(ts: datetime, price: str) -> Bar:

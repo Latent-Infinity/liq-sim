@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from liq.types import Bar, Fill, OrderRequest, OrderSide, OrderType
+from liq.core import Bar, Fill, OrderRequest, OrderSide, OrderType
 
 
 def match_order(

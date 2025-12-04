@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from liq.types import OrderRequest, PortfolioState
+from liq.core import OrderRequest, PortfolioState
 
 
 class ConstraintViolation(Exception):

@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from liq.types import OrderRequest
+from liq.core import OrderRequest
 
 
 class CommissionModel:

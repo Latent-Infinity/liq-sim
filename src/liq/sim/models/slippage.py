@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from liq.types import Bar, OrderRequest
+from liq.core import Bar, OrderRequest
 
 
 class SlippageModel:

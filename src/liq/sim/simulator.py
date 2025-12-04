@@ -24,7 +24,7 @@ from liq.sim.fx import convert_to_usd
 from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.validation import assert_no_lookahead, ensure_order_eligible
-from liq.types import Bar, Fill, OrderRequest, PortfolioState
+from liq.core import Bar, Fill, OrderRequest, PortfolioState
 
 
 @dataclass

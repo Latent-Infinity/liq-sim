@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional
 
-from liq.types import Fill, PortfolioState, Position
+from liq.core import Fill, PortfolioState, Position
 from liq.sim.fx import convert_to_usd
 from liq.sim.financing import borrow_cost, daily_swap, swap_applicable, swap_multiplier_for_weekday
 

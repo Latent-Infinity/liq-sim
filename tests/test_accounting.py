@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from liq.sim.accounting import AccountState, PositionRecord, PositionLot
-from liq.types import Fill
+from liq.core import Fill
 
 
 def make_fill(symbol: str, side: str, price: str, qty: str, ts: datetime | None = None) -> Fill:

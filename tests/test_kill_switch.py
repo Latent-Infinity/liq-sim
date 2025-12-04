@@ -5,8 +5,8 @@ from uuid import uuid4
 import pytest
 
 from liq.sim.constraints import ConstraintViolation, check_kill_switch
-from liq.types import OrderRequest
-from liq.types.enums import OrderSide, OrderType, TimeInForce
+from liq.core import OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_order(side: str) -> OrderRequest:

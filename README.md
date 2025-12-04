@@ -19,5 +19,5 @@ python -m liq.sim.cli run orders.json bars.json provider.json simulator.json --c
 python -m liq.sim.cli run orders.json bars.json provider.json simulator.json --checkpoint-in chk.pkl
 ```
 
-- `validate-config`: ensures provider and simulator configs conform to the PRD/liq-types models.
+- `validate-config`: ensures provider and simulator configs conform to the PRD/liq-core models.
 - `run`: executes a simulation from JSON inputs, prints equity via Rich, and can emit/resume from checkpoints.

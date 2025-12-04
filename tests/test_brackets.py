@@ -2,8 +2,8 @@ from decimal import Decimal
 from datetime import datetime, timezone
 
 from liq.sim.brackets import BracketState, create_brackets, process_brackets
-from liq.types import OrderRequest
-from liq.types.enums import OrderSide, OrderType
+from liq.core import OrderRequest
+from liq.core.enums import OrderSide, OrderType
 
 
 def make_entry(side: OrderSide, qty: str, sl: str | None, tp: str | None) -> OrderRequest:

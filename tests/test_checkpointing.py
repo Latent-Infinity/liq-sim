@@ -6,8 +6,8 @@ from pathlib import Path
 from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.types import Bar, OrderRequest
-from liq.types.enums import OrderSide, OrderType, TimeInForce
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 class RandomSlippage:

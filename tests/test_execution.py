@@ -3,8 +3,8 @@ from decimal import Decimal
 from uuid import uuid4
 
 from liq.sim.execution import match_order
-from liq.types import Bar, OrderRequest
-from liq.types.enums import OrderSide, OrderType, TimeInForce
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_order(

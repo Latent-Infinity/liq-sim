@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import List, Tuple
 
-from liq.types import OrderRequest, OrderSide, OrderType
+from liq.core import OrderRequest, OrderSide, OrderType
 
 
 @dataclass
