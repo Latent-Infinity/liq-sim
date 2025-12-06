@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import logging
+import random
+from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-import random
-from typing import Dict, List, Sequence
+
+from liq.core import Bar, Fill, OrderRequest, PortfolioState
 
 from liq.sim.accounting import AccountState
 from liq.sim.brackets import BracketState, create_brackets, process_brackets
+from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
+from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.constraints import (
+    ConstraintViolation,
     check_buying_power,
     check_kill_switch,
     check_margin,
@@ -18,21 +25,30 @@ from liq.sim.constraints import (
     check_position_limit,
     check_short_permission,
 )
-from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.execution import match_order
 from liq.sim.fx import convert_to_usd
 from liq.sim.providers import fee_model_from_config, slippage_model_from_config
-from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.validation import assert_no_lookahead, ensure_order_eligible
-from liq.core import Bar, Fill, OrderRequest, PortfolioState
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RejectedOrder:
+    """Record of an order rejected due to constraint violation."""
+
+    order: OrderRequest
+    reason: str
+    timestamp: datetime
 
 
 @dataclass
 class SimulationResult:
-    fills: List[Fill]
-    portfolio_history: List[Decimal]  # equity per bar (legacy alias)
-    equity_curve: List[tuple[datetime, Decimal]]
-    portfolio_states: List[PortfolioState]
+    fills: list[Fill]
+    portfolio_history: list[Decimal]  # equity per bar (legacy alias)
+    equity_curve: list[tuple[datetime, Decimal]]
+    portfolio_states: list[PortfolioState]
+    rejected_orders: list[RejectedOrder] = field(default_factory=list)
 
 
 @dataclass
@@ -48,7 +64,7 @@ class Simulator:
     daily_start_equity: Decimal = Decimal("0")
     kill_switch_engaged: bool = False
     current_day: datetime | None = None
-    active_brackets: List[BracketState] = field(default_factory=list)
+    active_brackets: list[BracketState] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.fee_model = fee_model_from_config(self.provider_config)
@@ -72,7 +88,7 @@ class Simulator:
             if "_" not in pair:
                 return price
             try:
-                return convert_to_usd(price, pair, fx_rates)
+                return Decimal(convert_to_usd(price, pair, fx_rates))
             except KeyError:
                 return price
         return price
@@ -93,7 +109,7 @@ class Simulator:
         )
 
     @classmethod
-    def from_checkpoint(cls, checkpoint: SimulationCheckpoint) -> "Simulator":
+    def from_checkpoint(cls, checkpoint: SimulationCheckpoint) -> Simulator:
         """Rehydrate a Simulator from a checkpoint."""
         checkpoint.restore_random_state()
         sim = cls(
@@ -119,25 +135,38 @@ class Simulator:
         min_delay = min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
         fills: list[Fill] = []
         equity_curve: list[tuple[datetime, Decimal]] = []
-        portfolio_states: list = []
+        portfolio_states: list[PortfolioState] = []
+        rejected_orders: list[RejectedOrder] = []
 
-        order_queue = list(orders)
-        became_eligible: Dict[int, bool] = {id(o): False for o in order_queue}
-        # map order -> bar index where order timestamp occurs
-        order_origin_index: Dict[int, int] = {}
-        for order in order_queue:
+        logger.info(
+            "Simulation started",
+            extra={
+                "order_count": len(orders),
+                "bar_count": len(bars),
+                "min_delay_bars": min_delay,
+                "provider": self.provider_config.name,
+                "initial_capital": str(self.config.initial_capital) if self.config.initial_capital else None,
+            },
+        )
+
+        # Precompute first eligible bar index for each order and sort once.
+        pending: deque[tuple[int, OrderRequest]] = deque()
+        for order in orders:
             origin_idx = 0
             for idx, bar in enumerate(bars):
                 if bar.timestamp >= order.timestamp:
                     origin_idx = idx
                     break
-            order_origin_index[id(order)] = origin_idx
+            pending.append((origin_idx, order))
+        pending = deque(sorted(pending, key=lambda x: x[0]))
+        active_orders: list[OrderRequest] = []
+        became_eligible: dict[int, bool] = {}
 
         for bar_idx, bar in enumerate(bars):
             # daily reset
             if self.current_day is None or bar.timestamp.date() != self.current_day.date():
                 # set daily start to current equity snapshot
-                marks = {symbol: bar.open for symbol in self.account_state.positions.keys()}
+                marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
                 snapshot = self.account_state.to_portfolio_state(
                     marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates
                 )
@@ -147,12 +176,12 @@ class Simulator:
             self.account_state.process_settlement(bar.timestamp)
             # apply daily swaps if applicable (for providers with financing)
             if swap_rates:
-                marks_for_swaps = {symbol: bar.close for symbol in self.account_state.positions.keys()}
+                marks_for_swaps = dict.fromkeys(self.account_state.positions.keys(), bar.close)
                 self.account_state.apply_daily_swap(
                     bar.timestamp, swap_rates=swap_rates, marks=marks_for_swaps, fx_rates=fx_rates
                 )
             # compute equity snapshot at bar open for drawdown/daily loss checks
-            marks_open = {symbol: bar.open for symbol in self.account_state.positions.keys()}
+            marks_open = dict.fromkeys(self.account_state.positions.keys(), bar.open)
             snapshot_open = self.account_state.to_portfolio_state(
                 marks=marks_open, timestamp=bar.timestamp, fx_rates=fx_rates
             )
@@ -168,21 +197,17 @@ class Simulator:
                 if current_equity < self.daily_start_equity * (Decimal("1") - Decimal(str(self.config.max_daily_loss_pct))):
                     self.kill_switch_engaged = True
 
-            # validate order eligibility and look-ahead
-            eligible_orders = []
-            for order in order_queue:
-                created_idx = order_origin_index[id(order)]
-                if bar.timestamp < order.timestamp:
-                    continue
+            # Activate newly eligible orders for this bar
+            while pending and pending[0][0] <= bar_idx:
+                _, order = pending.popleft()
                 assert_no_lookahead(order.timestamp, bar.timestamp)
-                if ensure_eligible(created_idx, bar_idx, min_delay):
-                    became_eligible[id(order)] = True
-                    eligible_orders.append(order)
+                became_eligible[id(order)] = True
+                active_orders.append(order)
 
             executed_orders: list[OrderRequest] = []
-            for order in eligible_orders:
+            for order in list(active_orders):
                 # constraints: position limit (based on current equity) and PDT placeholder
-                pre_marks = {symbol: bar.open for symbol in self.account_state.positions.keys()}
+                pre_marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
                 portfolio_snapshot = self.account_state.to_portfolio_state(
                     marks=pre_marks, timestamp=bar.timestamp, fx_rates=fx_rates
                 )
@@ -190,7 +215,20 @@ class Simulator:
                 # Kill-switch: block exposure-increasing (buys) when engaged
                 try:
                     check_kill_switch(self.kill_switch_engaged, order)
-                except Exception:
+                except ConstraintViolation as e:
+                    rejected_orders.append(RejectedOrder(
+                        order=order,
+                        reason=e.message,
+                        timestamp=bar.timestamp,
+                    ))
+                    logger.debug(
+                        "Order rejected: kill-switch engaged",
+                        extra={
+                            "order_id": str(order.client_order_id),
+                            "symbol": order.symbol,
+                            "reason": e.message,
+                        },
+                    )
                     continue
                 # PDT: detect if this order would be a day trade (flat after trade same day)
                 is_day_trade = False
@@ -222,7 +260,22 @@ class Simulator:
                         locate_required=self.provider_config.locate_required,
                     )
                     check_pdt(portfolio_snapshot, is_day_trade=is_day_trade)
-                except Exception:
+                except ConstraintViolation as e:
+                    rejected_orders.append(RejectedOrder(
+                        order=order,
+                        reason=e.message,
+                        timestamp=bar.timestamp,
+                    ))
+                    logger.debug(
+                        "Order rejected: constraint violation",
+                        extra={
+                            "order_id": str(order.client_order_id),
+                            "symbol": order.symbol,
+                            "side": str(order.side),
+                            "quantity": str(order.quantity),
+                            "reason": e.message,
+                        },
+                    )
                     continue
 
                 slippage = self.slippage_model.calculate(order, bar)
@@ -252,18 +305,42 @@ class Simulator:
                         fx_rates=fx_rates,
                     )
                     fills.append(fill.model_copy(update={"realized_pnl": realized}))
+                    logger.debug(
+                        "Order filled",
+                        extra={
+                            "order_id": str(order.client_order_id),
+                            "symbol": fill.symbol,
+                            "side": fill.side.value,
+                            "quantity": str(fill.quantity),
+                            "price": str(fill.price),
+                            "commission": str(fill.commission),
+                            "realized_pnl": str(realized),
+                        },
+                    )
                     bracket = create_brackets(fill.price, order)
                     if bracket.stop_loss or bracket.take_profit:
                         self.active_brackets.append(bracket)
 
             # remove executed
-            order_queue = [o for o in order_queue if o not in executed_orders]
+            active_orders = [o for o in active_orders if o not in executed_orders]
 
             # process active brackets (eligible starting next bar)
             remaining_brackets: list[BracketState] = []
             for bracket in self.active_brackets:
                 trigger, _ = process_brackets(bracket, bar_high=bar.high, bar_low=bar.low)
                 if trigger:
+                    trigger_type = "stop_loss" if trigger == bracket.stop_loss else "take_profit"
+                    logger.debug(
+                        "Bracket triggered",
+                        extra={
+                            "parent_id": bracket.parent_id,
+                            "trigger_type": trigger_type,
+                            "symbol": trigger.symbol,
+                            "side": trigger.side.value,
+                            "bar_high": str(bar.high),
+                            "bar_low": str(bar.low),
+                        },
+                    )
                     slippage = self.slippage_model.calculate(trigger, bar)
                     fill = match_order(
                         trigger,
@@ -285,9 +362,9 @@ class Simulator:
                     remaining_brackets.append(bracket)
             self.active_brackets = remaining_brackets
             # DAY orders expire at bar close only after they've been eligible once
-            order_queue = [
+            active_orders = [
                 o
-                for o in order_queue
+                for o in active_orders
                 if not (
                     o.time_in_force.name == "DAY"
                     and o not in executed_orders
@@ -295,17 +372,30 @@ class Simulator:
                 )
             ]
             # record equity (cash + unsettled + mark to bar close for now)
-            marks = {symbol: bar.close for symbol in self.account_state.positions.keys()}
+            marks = dict.fromkeys(self.account_state.positions.keys(), bar.close)
             portfolio = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates)
             equity_curve.append((bar.timestamp, portfolio.equity))
             portfolio_states.append(portfolio)
 
         portfolio_history = [eq for _, eq in equity_curve]
+
+        final_equity = equity_curve[-1][1] if equity_curve else Decimal("0")
+        logger.info(
+            "Simulation completed",
+            extra={
+                "fill_count": len(fills),
+                "rejected_count": len(rejected_orders),
+                "final_equity": str(final_equity),
+                "bar_count_processed": len(bars),
+            },
+        )
+
         return SimulationResult(
             fills=fills,
             portfolio_history=portfolio_history,
             equity_curve=equity_curve,
             portfolio_states=portfolio_states,
+            rejected_orders=rejected_orders,
         )
 
 
