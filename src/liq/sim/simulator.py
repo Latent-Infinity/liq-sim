@@ -149,7 +149,7 @@ class Simulator:
             },
         )
 
-        # Precompute first eligible bar index for each order and sort once.
+        # Precompute first eligible bar index for each order and sort once (activation by bar index).
         pending: deque[tuple[int, OrderRequest]] = deque()
         for order in orders:
             origin_idx = 0
@@ -205,13 +205,17 @@ class Simulator:
                 active_orders.append(order)
 
             executed_orders: list[OrderRequest] = []
+            # Reuse a single portfolio snapshot and mark cache per symbol for this bar.
+            pre_marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
+            portfolio_snapshot = self.account_state.to_portfolio_state(
+                marks=pre_marks, timestamp=bar.timestamp, fx_rates=fx_rates
+            )
+            mark_cache: dict[str, Decimal] = {}
             for order in list(active_orders):
-                # constraints: position limit (based on current equity) and PDT placeholder
-                pre_marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
-                portfolio_snapshot = self.account_state.to_portfolio_state(
-                    marks=pre_marks, timestamp=bar.timestamp, fx_rates=fx_rates
-                )
-                mark_for_constraints = self._mark_in_account_ccy(bar.open, order.symbol, fx_rates)
+                mark_for_constraints = mark_cache.get(order.symbol)
+                if mark_for_constraints is None:
+                    mark_for_constraints = self._mark_in_account_ccy(bar.open, order.symbol, fx_rates)
+                    mark_cache[order.symbol] = mark_for_constraints
                 # Kill-switch: block exposure-increasing (buys) when engaged
                 try:
                     check_kill_switch(self.kill_switch_engaged, order)
@@ -362,15 +366,16 @@ class Simulator:
                     remaining_brackets.append(bracket)
             self.active_brackets = remaining_brackets
             # DAY orders expire at bar close only after they've been eligible once
-            active_orders = [
-                o
-                for o in active_orders
-                if not (
-                    o.time_in_force.name == "DAY"
-                    and o not in executed_orders
-                    and became_eligible.get(id(o), False)
-                )
-            ]
+            if active_orders:
+                active_orders = [
+                    o
+                    for o in active_orders
+                    if not (
+                        o.time_in_force.name == "DAY"
+                        and o not in executed_orders
+                        and became_eligible.get(id(o), False)
+                    )
+                ]
             # record equity (cash + unsettled + mark to bar close for now)
             marks = dict.fromkeys(self.account_state.positions.keys(), bar.close)
             portfolio = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates)
