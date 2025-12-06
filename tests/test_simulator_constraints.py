@@ -47,3 +47,59 @@ def test_position_limit_blocks_order() -> None:
     bars = [make_bar(t0, "100")]
     result = sim.run(orders, bars)
     assert len(result.fills) == 0
+
+
+def test_rejected_orders_tracked_in_result() -> None:
+    """Rejected orders should be recorded in SimulationResult.rejected_orders."""
+    cfg = ProviderConfig(
+        name="coinbase",
+        asset_classes=["crypto"],
+        fee_model="ZeroCommission",
+        slippage_model="VolumeWeighted",
+        slippage_params={"base_bps": "0", "volume_impact": "0"},
+    )
+    # Small capital, order will exceed buying power
+    sim = Simulator(
+        provider_config=cfg,
+        config=SimulatorConfig(initial_capital=Decimal("100"), min_order_delay_bars=0),
+    )
+    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    # Order value = 10 * 100 = 1000, but only 100 cash available
+    orders = [make_order(t0, qty="10", price="100")]
+    bars = [make_bar(t0, "100")]
+
+    result = sim.run(orders, bars)
+
+    assert len(result.fills) == 0
+    assert len(result.rejected_orders) == 1
+    rejected = result.rejected_orders[0]
+    assert rejected.order.quantity == Decimal("10")
+    assert "buying power" in rejected.reason.lower() or "equity" in rejected.reason.lower()
+
+
+def test_multiple_rejections_all_tracked() -> None:
+    """Multiple rejected orders should all be recorded."""
+    cfg = ProviderConfig(
+        name="coinbase",
+        asset_classes=["crypto"],
+        fee_model="ZeroCommission",
+        slippage_model="VolumeWeighted",
+        slippage_params={"base_bps": "0", "volume_impact": "0"},
+    )
+    sim = Simulator(
+        provider_config=cfg,
+        config=SimulatorConfig(initial_capital=Decimal("50"), min_order_delay_bars=0),
+    )
+    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t1 = datetime(2024, 1, 2, tzinfo=timezone.utc)
+    # Both orders exceed buying power
+    orders = [
+        make_order(t0, qty="10", price="100"),
+        make_order(t1, qty="5", price="100"),
+    ]
+    bars = [make_bar(t0, "100"), make_bar(t1, "100")]
+
+    result = sim.run(orders, bars)
+
+    assert len(result.fills) == 0
+    assert len(result.rejected_orders) == 2

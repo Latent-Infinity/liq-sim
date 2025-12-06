@@ -132,10 +132,6 @@ class Simulator:
         fx_rates: dict[str, Decimal] | None = None,
         swap_rates: dict[str, Decimal] | None = None,
     ) -> SimulationResult:
-        original_bars = bars
-        sim_timeframe = getattr(self.config, "sim_timeframe", "1m")
-        if sim_timeframe == "5m_guarded":  # pragma: no cover (optional guarded mode)
-            bars = self._aggregate_bars(original_bars, window_minutes=5)
         min_delay = min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
         fills: list[Fill] = []
         equity_curve: list[tuple[datetime, Decimal]] = []
@@ -305,8 +301,6 @@ class Simulator:
                     timestamp=bar.timestamp,
                 )
                 if fill:
-                    if sim_timeframe == "5m_guarded" and not self._intra_bar_feasible(order, bar, original_bars):
-                        continue
                     executed_orders.append(order)
                     if is_day_trade and self.account_state.day_trades_remaining is not None:
                         self.account_state.day_trades_remaining = max(

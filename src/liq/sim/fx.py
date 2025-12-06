@@ -1,6 +1,9 @@
 """FX conversion helpers for cross/quote/base handling."""
 
+import logging
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 
 def convert_to_usd(pnl: Decimal, pair: str, rates: dict[str, Decimal]) -> Decimal:
@@ -19,6 +22,10 @@ def convert_to_usd(pnl: Decimal, pair: str, rates: dict[str, Decimal]) -> Decima
     if pair.startswith("USD_"):
         rate = rates.get(pair, None)
         if rate is None:
+            logger.warning(
+                "FX rate lookup failed",
+                extra={"pair": pair, "available_rates": list(rates.keys())},
+            )
             raise KeyError(f"Missing FX rate for {pair}")
         return pnl / rate
     # cross
@@ -26,5 +33,9 @@ def convert_to_usd(pnl: Decimal, pair: str, rates: dict[str, Decimal]) -> Decima
     usd_pair = f"USD_{quote}"
     rate = rates.get(usd_pair, None)
     if rate is None:
+        logger.warning(
+            "FX rate lookup failed for cross pair",
+            extra={"original_pair": pair, "usd_pair": usd_pair, "available_rates": list(rates.keys())},
+        )
         raise KeyError(f"Missing FX rate for {usd_pair}")
     return pnl / rate

@@ -22,7 +22,7 @@ class TieredMakerTakerFee(CommissionModel):
     def calculate(self, order: OrderRequest, fill_price: Decimal, is_maker: bool) -> Decimal:
         notional = order.quantity * fill_price
         bps = self.maker_bps if is_maker else self.taker_bps
-        return (notional * bps) / Decimal("10000")
+        return Decimal((notional * bps) / Decimal("10000"))
 
 
 class ZeroCommissionFee(CommissionModel):
@@ -41,6 +41,6 @@ class PerShareFee(CommissionModel):
 
     def calculate(self, order: OrderRequest, fill_price: Decimal, is_maker: bool) -> Decimal:
         fee = self.per_share * order.quantity
-        if self.min_per_order is not None:
-            fee = max(fee, self.min_per_order)
-        return fee
+        if self.min_per_order is not None and fee < self.min_per_order:
+            fee = self.min_per_order
+        return Decimal(fee)

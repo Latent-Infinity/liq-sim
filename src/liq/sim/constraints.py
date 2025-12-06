@@ -25,7 +25,9 @@ def check_buying_power(
     order_value = order.quantity * mark_price
     available = portfolio.cash + portfolio.unsettled_cash
     if order_value > available:
-        raise ConstraintViolation("Insufficient buying power")
+        raise ConstraintViolation(
+            f"Insufficient buying power: order value {order_value} exceeds available {available}"
+        )
 
 
 def check_margin(
@@ -40,7 +42,9 @@ def check_margin(
     equity = portfolio.equity if hasattr(portfolio, "equity") else portfolio.cash
     required = order.quantity * mark_price * initial_margin_rate
     if required > equity:
-        raise ConstraintViolation("Margin requirement exceeds equity")
+        raise ConstraintViolation(
+            f"Margin requirement exceeds equity: required {required}, available equity {equity}"
+        )
 
 
 def check_short_permission(
@@ -59,7 +63,9 @@ def check_short_permission(
                 metadata = getattr(order, "metadata", None) or {}
                 locate_ok = bool(metadata.get("locate_available") or metadata.get("locate_borrowed"))
                 if not locate_ok:
-                    raise ConstraintViolation("Locate required for short selling")
+                    raise ConstraintViolation(
+                        f"Locate required for short selling {order.symbol}: no locate_available or locate_borrowed in metadata"
+                    )
         return
     side_val = str(order.side).lower()
     if side_val.endswith("sell"):
@@ -67,7 +73,9 @@ def check_short_permission(
         pre_pos = portfolio.positions.get(order.symbol)
         pre_qty = getattr(pre_pos, "quantity", Decimal("0")) if pre_pos else Decimal("0")
         if order.quantity > pre_qty:
-            raise ConstraintViolation("Shorting not permitted for this provider")
+            raise ConstraintViolation(
+                f"Shorting not permitted: sell qty {order.quantity} exceeds position {pre_qty}"
+            )
 
 
 def check_position_limit(
@@ -83,12 +91,15 @@ def check_position_limit(
         return
     equity = portfolio.equity if hasattr(portfolio, "equity") else portfolio.cash
     if equity <= 0:
-        raise ConstraintViolation("Cannot trade with non-positive equity")
+        raise ConstraintViolation(f"Cannot trade with non-positive equity: {equity}")
     target_value = order.quantity * mark_price
     max_value = Decimal(str(max_position_pct)) * equity
     # crude additive check ignoring existing position direction; refined logic can consider net
     if target_value > max_value:
-        raise ConstraintViolation("Position limit exceeded")
+        raise ConstraintViolation(
+            f"Position limit exceeded: order value {target_value} exceeds max {max_value} "
+            f"({max_position_pct * 100:.1f}% of equity {equity})"
+        )
 
 
 def check_pdt(
@@ -100,7 +111,9 @@ def check_pdt(
     if remaining is None:
         return
     if is_day_trade and remaining <= 0:
-        raise ConstraintViolation("PDT limit exceeded")
+        raise ConstraintViolation(
+            f"PDT limit exceeded: {remaining} day trades remaining, order would create a day trade"
+        )
 
 
 def check_kill_switch(

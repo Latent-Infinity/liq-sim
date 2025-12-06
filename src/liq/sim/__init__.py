@@ -5,7 +5,9 @@ __all__ = [
     "ProviderConfig",
     "LookAheadBiasError",
     "SimulationCheckpoint",
+    "CheckpointFormatError",
     "SimulationResult",
+    "RejectedOrder",
     "Simulator",
     "is_order_eligible",
     "assert_no_lookahead",
@@ -16,13 +18,13 @@ __all__ = [
     "PFOFSlippage",
 ]
 
+from liq.sim.checkpoint import CheckpointFormatError, SimulationCheckpoint
 from liq.sim.config import ProviderConfig, SimulatorConfig
-from liq.sim.execution import match_order
 from liq.sim.exceptions import LookAheadBiasError
-from liq.sim.checkpoint import SimulationCheckpoint
-from liq.sim.simulator import SimulationResult, Simulator
+from liq.sim.execution import match_order
 from liq.sim.models.fee import TieredMakerTakerFee, ZeroCommissionFee
 from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
+from liq.sim.simulator import RejectedOrder, SimulationResult, Simulator
 from liq.sim.validation import assert_no_lookahead, is_order_eligible
 
 __version__ = "0.1.0"

@@ -23,10 +23,11 @@ class VolumeWeightedSlippage(SlippageModel):
         volume = bar.volume
         participation = Decimal("0")
         if volume > 0:
-            participation = min(Decimal("1"), order.quantity / volume)
+            ratio = order.quantity / volume
+            participation = ratio if ratio < Decimal("1") else Decimal("1")
         slippage_bps = self.base_bps + self.volume_impact * participation
         price_ref = bar.midrange
-        return (price_ref * slippage_bps) / Decimal("10000")
+        return Decimal((price_ref * slippage_bps) / Decimal("10000"))
 
 
 class PFOFSlippage(SlippageModel):
@@ -37,4 +38,4 @@ class PFOFSlippage(SlippageModel):
 
     def calculate(self, order: OrderRequest, bar: Bar) -> Decimal:
         price_ref = bar.midrange
-        return (price_ref * self.adverse_bps) / Decimal("10000")
+        return Decimal((price_ref * self.adverse_bps) / Decimal("10000"))

@@ -13,6 +13,7 @@ authors = [{ name = "Latent Infinity Solutions" }]
 dependencies = [
     "liq-core>=0.1.0",
     "pydantic>=2.10",
+    "msgspec>=0.18",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,8 @@ packages = ["src/liq"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP"]
 ignore = ["E501"]
 
@@ -40,6 +43,9 @@ quote-style = "double"
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+mypy_path = "src"
+namespace_packages = true
+explicit_package_bases = true
 
 [tool.pytest.ini_options]
 addopts = "--cov=liq.sim --cov-report=term-missing --cov-fail-under=90"

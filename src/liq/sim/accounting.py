@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, List, Optional
 
 from liq.core import Fill, PortfolioState, Position
-from liq.sim.fx import convert_to_usd
+
 from liq.sim.financing import borrow_cost, daily_swap, swap_applicable, swap_multiplier_for_weekday
+from liq.sim.fx import convert_to_usd
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,20 +36,20 @@ class SettlementEntry:
 class PositionRecord:
     """Tracks lots and realized P&L for a symbol."""
 
-    lots: List[PositionLot] = field(default_factory=list)
+    lots: list[PositionLot] = field(default_factory=list)
     realized_pnl: Decimal = Decimal("0")
 
     @property
     def net_quantity(self) -> Decimal:
-        return sum(l.quantity for l in self.lots)
+        return sum((lot.quantity for lot in self.lots), Decimal("0"))
 
     @property
     def avg_entry_price(self) -> Decimal:
         net_qty = self.net_quantity
         if net_qty == 0:
             return Decimal("0")
-        weighted = sum(l.entry_price * l.quantity for l in self.lots)
-        return weighted / net_qty
+        weighted = sum(lot.entry_price * lot.quantity for lot in self.lots)
+        return Decimal(weighted / net_qty)
 
     def apply_fill(self, fill: Fill) -> Decimal:
         """Apply a fill to lots and return realized P&L from this fill."""
@@ -122,9 +125,9 @@ class AccountState:
 
     cash: Decimal
     unsettled_cash: Decimal = Decimal("0")
-    positions: Dict[str, PositionRecord] = field(default_factory=dict)
-    settlement_queue: List[SettlementEntry] = field(default_factory=list)
-    day_trades_remaining: Optional[int] = None
+    positions: dict[str, PositionRecord] = field(default_factory=dict)
+    settlement_queue: list[SettlementEntry] = field(default_factory=list)
+    day_trades_remaining: int | None = None
     account_currency: str = "USD"
     last_swap_time: datetime | None = None
 
@@ -148,6 +151,10 @@ class AccountState:
             try:
                 notional_account_ccy = convert_to_usd(notional, symbol_key, fx_rates)
             except KeyError:
+                logger.warning(
+                    "FX rate missing for notional conversion, using raw value",
+                    extra={"symbol": fill.symbol, "symbol_key": symbol_key},
+                )
                 notional_account_ccy = notional
 
         total_cost = notional_account_ccy + fill.commission
@@ -170,6 +177,10 @@ class AccountState:
                 try:
                     borrow_mark = convert_to_usd(fill.price, symbol_key, fx_rates)
                 except KeyError:
+                    logger.warning(
+                        "FX rate missing for borrow cost conversion, using raw value",
+                        extra={"symbol": fill.symbol, "symbol_key": symbol_key},
+                    )
                     borrow_mark = fill.price
             cost = borrow_cost(abs(symbol_rec.net_quantity) * borrow_mark, borrow_rate_annual)
             self.cash -= cost
@@ -182,7 +193,10 @@ class AccountState:
                     symbol_rec.realized_pnl += realized_converted - realized_trade_ccy
                 realized = realized_converted
             except KeyError:
-                # leave as-is if rate missing
+                logger.warning(
+                    "FX rate missing for realized P&L conversion, using raw value",
+                    extra={"symbol": fill.symbol, "symbol_key": symbol_key},
+                )
                 realized = realized_trade_ccy
         return realized
 
@@ -193,6 +207,14 @@ class AccountState:
             if current_time >= entry.release_time:
                 self.unsettled_cash -= entry.amount
                 self.cash += entry.amount
+                logger.debug(
+                    "Settlement released",
+                    extra={
+                        "amount": str(entry.amount),
+                        "release_time": entry.release_time.isoformat(),
+                        "cash_after": str(self.cash),
+                    },
+                )
             else:
                 remaining_queue.append(entry)
         self.settlement_queue = remaining_queue
@@ -223,6 +245,10 @@ class AccountState:
                 try:
                     mark_ccy = convert_to_usd(mark, symbol.replace("-", "_"), fx_rates)
                 except KeyError:
+                    logger.warning(
+                        "FX rate missing for swap calculation, using raw mark",
+                        extra={"symbol": symbol},
+                    )
                     mark_ccy = mark
             multiplier = swap_multiplier_for_weekday(current_time)
             notional = abs(rec.net_quantity) * mark_ccy

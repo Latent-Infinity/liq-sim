@@ -12,8 +12,8 @@ class SpreadBasedSlippage:
         # Use ask - bid if available, else fall back to (high - low) as a crude spread proxy
         spread_attr = getattr(bar, "spread", None)
         if spread_attr is not None:
-            spread = spread_attr
+            spread: Decimal = spread_attr
         else:
             spread = bar.high - bar.low
         # Return half-spread so that buy adds and sell subtracts to achieve full width
-        return spread / 2
+        return Decimal(spread / 2)

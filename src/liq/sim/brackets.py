@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import List, Tuple
 
 from liq.core import OrderRequest, OrderSide, OrderType
 
@@ -52,7 +51,7 @@ def process_brackets(
     bracket: BracketState,
     bar_high: Decimal,
     bar_low: Decimal,
-) -> Tuple[OrderRequest | None, OrderRequest | None]:
+) -> tuple[OrderRequest | None, OrderRequest | None]:
     """Determine which bracket (if any) triggers on this bar; apply adverse-path rule."""
     sl_trigger = bracket.stop_loss and (
         (bracket.stop_loss.side == OrderSide.SELL and bar_low <= bracket.stop_loss.stop_price)

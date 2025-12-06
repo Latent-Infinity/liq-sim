@@ -2,6 +2,7 @@
 
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -73,9 +74,9 @@ class ProviderConfig(BaseModel):
     name: str
     asset_classes: list[str]
     fee_model: str
-    fee_params: dict = Field(default_factory=dict)
+    fee_params: dict[str, Any] = Field(default_factory=dict)
     slippage_model: str
-    slippage_params: dict = Field(default_factory=dict)
+    slippage_params: dict[str, Any] = Field(default_factory=dict)
     margin_type: str | None = None  # None, RegT, Portfolio, Leveraged
     initial_margin_rate: Decimal = Decimal("1.0")
     maintenance_margin_rate: Decimal = Decimal("1.0")

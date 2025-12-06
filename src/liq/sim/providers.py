@@ -3,13 +3,12 @@
 from decimal import Decimal
 
 from liq.sim.config import ProviderConfig
-from liq.sim.models.fee import TieredMakerTakerFee, ZeroCommissionFee
+from liq.sim.models.fee import PerShareFee, TieredMakerTakerFee, ZeroCommissionFee
 from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
 from liq.sim.models.spread import SpreadBasedSlippage
-from liq.sim.models.fee import PerShareFee
 
 
-def fee_model_from_config(cfg: ProviderConfig):
+def fee_model_from_config(cfg: ProviderConfig) -> TieredMakerTakerFee | ZeroCommissionFee | PerShareFee:
     """Instantiate commission model from config."""
     if cfg.fee_model == "TieredMakerTaker":
         maker_bps = Decimal(str(cfg.fee_params.get("maker_bps", "0")))
@@ -26,7 +25,7 @@ def fee_model_from_config(cfg: ProviderConfig):
     raise ValueError(f"Unsupported fee_model: {cfg.fee_model}")
 
 
-def slippage_model_from_config(cfg: ProviderConfig):
+def slippage_model_from_config(cfg: ProviderConfig) -> VolumeWeightedSlippage | PFOFSlippage | SpreadBasedSlippage:
     """Instantiate slippage model from config."""
     if cfg.slippage_model == "VolumeWeighted":
         base_bps = Decimal(str(cfg.slippage_params.get("base_bps", "0")))

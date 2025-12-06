@@ -3,28 +3,30 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import typer
+from liq.core import Bar, OrderRequest
 from rich.console import Console
 from rich.table import Table
 
 from liq.sim.checkpoint import SimulationCheckpoint
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
 
 app = typer.Typer(help="liq-sim CLI")
 console = Console()
 
 
-def _load_json(path: Path):
+def _load_json(path: Path) -> Any:
     with path.open() as f:
         return json.load(f)
 
 
-def _render_equity_curve(equity_curve):
+def _render_equity_curve(equity_curve: list[tuple[datetime, Decimal]]) -> None:
     table = Table(title="Equity Curve", show_lines=False)
     table.add_column("Timestamp")
     table.add_column("Equity", justify="right")
@@ -35,8 +37,8 @@ def _render_equity_curve(equity_curve):
 
 @app.command("validate-config")
 def validate_config(
-    provider_config: Path = typer.Argument(..., help="Path to provider config JSON"),
-    simulator_config: Path = typer.Argument(..., help="Path to simulator config JSON"),
+    provider_config: Path = typer.Argument(..., help="Path to provider config JSON"),  # noqa: B008
+    simulator_config: Path = typer.Argument(..., help="Path to simulator config JSON"),  # noqa: B008
 ) -> None:
     """Validate provider and simulator configurations."""
     try:
@@ -44,18 +46,18 @@ def validate_config(
         SimulatorConfig(**_load_json(simulator_config))
     except Exception as exc:  # noqa: BLE001
         console.print(f"[red]Invalid config:[/red] {exc}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     console.print("[green]Configs are valid.[/green]")
 
 
 @app.command("run")
 def run_sim(
-    orders_path: Path = typer.Argument(..., help="Path to orders JSON list"),
-    bars_path: Path = typer.Argument(..., help="Path to bars JSON list"),
-    provider_config: Path = typer.Argument(..., help="Path to provider config JSON"),
-    simulator_config: Path = typer.Argument(..., help="Path to simulator config JSON"),
-    checkpoint_in: Optional[Path] = typer.Option(None, help="Checkpoint to resume from"),
-    checkpoint_out: Optional[Path] = typer.Option(None, help="Where to write checkpoint after run"),
+    orders_path: Path = typer.Argument(..., help="Path to orders JSON list"),  # noqa: B008
+    bars_path: Path = typer.Argument(..., help="Path to bars JSON list"),  # noqa: B008
+    provider_config: Path = typer.Argument(..., help="Path to provider config JSON"),  # noqa: B008
+    simulator_config: Path = typer.Argument(..., help="Path to simulator config JSON"),  # noqa: B008
+    checkpoint_in: Path | None = typer.Option(None, help="Checkpoint to resume from"),  # noqa: B008
+    checkpoint_out: Path | None = typer.Option(None, help="Where to write checkpoint after run"),  # noqa: B008
 ) -> None:
     """Run a simulation from JSON inputs and render summary."""
     if checkpoint_in:

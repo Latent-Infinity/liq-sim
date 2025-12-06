@@ -72,3 +72,82 @@ def test_run_command_smoke(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     assert "Fills:" in result.stdout
+
+
+def test_validate_config_malformed_json(tmp_path: Path) -> None:
+    """Malformed JSON should produce clear error."""
+    p_path = tmp_path / "provider.json"
+    p_path.write_text("{invalid json}")
+    s_path = tmp_path / "sim.json"
+    s_path.write_text("{}")
+
+    result = runner.invoke(app, ["validate-config", str(p_path), str(s_path)])
+    assert result.exit_code == 1
+    assert "Invalid config" in result.stdout
+
+
+def test_validate_config_missing_required_field(tmp_path: Path) -> None:
+    """Missing required field should produce validation error."""
+    # Provider config missing 'name' field
+    provider_cfg = {
+        "asset_classes": ["crypto"],
+        "fee_model": "ZeroCommission",
+        "slippage_model": "VolumeWeighted",
+    }
+    sim_cfg = {"initial_capital": "1000", "min_order_delay_bars": 0}
+    p_path = _write_json(tmp_path, "provider.json", provider_cfg)
+    s_path = _write_json(tmp_path, "sim.json", sim_cfg)
+
+    result = runner.invoke(app, ["validate-config", str(p_path), str(s_path)])
+    assert result.exit_code == 1
+    assert "Invalid config" in result.stdout
+
+
+def test_run_with_checkpoint_output(tmp_path: Path) -> None:
+    """Run command should write checkpoint when --checkpoint-out specified."""
+    provider_cfg = {
+        "name": "coinbase",
+        "asset_classes": ["crypto"],
+        "fee_model": "ZeroCommission",
+        "slippage_model": "VolumeWeighted",
+        "slippage_params": {"base_bps": "0", "volume_impact": "0"},
+    }
+    sim_cfg = {"initial_capital": "1000", "min_order_delay_bars": 0}
+    order = {
+        "symbol": "BTC-USD",
+        "side": "buy",
+        "order_type": "market",
+        "quantity": "1",
+        "time_in_force": "day",
+        "timestamp": "2024-01-01T00:00:00Z",
+    }
+    bar = {
+        "symbol": "BTC-USD",
+        "timestamp": "2024-01-01T00:00:00Z",
+        "open": "100",
+        "high": "100",
+        "low": "100",
+        "close": "100",
+        "volume": "1000",
+    }
+    orders_path = _write_json(tmp_path, "orders.json", [order])
+    bars_path = _write_json(tmp_path, "bars.json", [bar])
+    p_path = _write_json(tmp_path, "provider.json", provider_cfg)
+    s_path = _write_json(tmp_path, "sim.json", sim_cfg)
+    chk_path = tmp_path / "checkpoint.msgpack"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(orders_path),
+            str(bars_path),
+            str(p_path),
+            str(s_path),
+            "--checkpoint-out",
+            str(chk_path),
+        ],
+    )
+    assert result.exit_code == 0
+    assert chk_path.exists()
+    assert "Checkpoint written" in result.stdout
