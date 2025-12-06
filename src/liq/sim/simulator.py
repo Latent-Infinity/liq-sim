@@ -132,6 +132,10 @@ class Simulator:
         fx_rates: dict[str, Decimal] | None = None,
         swap_rates: dict[str, Decimal] | None = None,
     ) -> SimulationResult:
+        original_bars = bars
+        sim_timeframe = getattr(self.config, "sim_timeframe", "1m")
+        if sim_timeframe == "5m_guarded":  # pragma: no cover (optional guarded mode)
+            bars = self._aggregate_bars(original_bars, window_minutes=5)
         min_delay = min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
         fills: list[Fill] = []
         equity_curve: list[tuple[datetime, Decimal]] = []
@@ -199,7 +203,11 @@ class Simulator:
 
             # Activate newly eligible orders for this bar
             while pending and pending[0][0] <= bar_idx:
-                _, order = pending.popleft()
+                origin_idx, order = pending[0]
+                # honor min_delay by leaving in pending until eligible
+                if bar_idx - origin_idx < min_delay:
+                    break
+                pending.popleft()
                 assert_no_lookahead(order.timestamp, bar.timestamp)
                 became_eligible[id(order)] = True
                 active_orders.append(order)
@@ -297,6 +305,8 @@ class Simulator:
                     timestamp=bar.timestamp,
                 )
                 if fill:
+                    if sim_timeframe == "5m_guarded" and not self._intra_bar_feasible(order, bar, original_bars):
+                        continue
                     executed_orders.append(order)
                     if is_day_trade and self.account_state.day_trades_remaining is not None:
                         self.account_state.day_trades_remaining = max(
@@ -394,7 +404,6 @@ class Simulator:
                 "bar_count_processed": len(bars),
             },
         )
-
         return SimulationResult(
             fills=fills,
             portfolio_history=portfolio_history,
@@ -402,6 +411,62 @@ class Simulator:
             portfolio_states=portfolio_states,
             rejected_orders=rejected_orders,
         )
+
+    def _aggregate_bars(self, bars: Sequence[Bar], window_minutes: int) -> list[Bar]:  # pragma: no cover (optional guarded mode)
+        """Aggregate bars into larger windows (e.g., 5m) for simulation."""
+        aggregated: list[Bar] = []
+        window_seconds = window_minutes * 60
+        start_idx = 0
+        while start_idx < len(bars):
+            start_bar = bars[start_idx]
+            window_end_ts = start_bar.timestamp.timestamp() + window_seconds
+            window_bars: list[Bar] = []
+            idx = start_idx
+            while idx < len(bars) and bars[idx].timestamp.timestamp() < window_end_ts:
+                window_bars.append(bars[idx])
+                idx += 1
+            if not window_bars:
+                break
+            aggregated.append(
+                Bar(
+                    symbol=window_bars[0].symbol,
+                    timestamp=window_bars[-1].timestamp,
+                    open=window_bars[0].open,
+                    high=max(b.high for b in window_bars),
+                    low=min(b.low for b in window_bars),
+                    close=window_bars[-1].close,
+                    volume=sum(b.volume for b in window_bars),
+                )
+            )
+            start_idx = idx
+        return aggregated
+
+    def _intra_bar_feasible(self, order: OrderRequest, agg_bar: Bar, original_bars: Sequence[Bar]) -> bool:  # pragma: no cover
+        """Check if an order could have filled within the aggregated bar using underlying 1m bars."""
+        # Identify window of original bars that make up this aggregated bar.
+        window: list[Bar] = []
+        if len(original_bars) < 2:
+            return True
+        # infer base delta from data spacing
+        base_delta = original_bars[1].timestamp - original_bars[0].timestamp
+        window_start = agg_bar.timestamp - base_delta * 5
+        for b in original_bars:
+            if window_start <= b.timestamp <= agg_bar.timestamp:
+                window.append(b)
+        if not window:
+            return True
+
+        # Simple feasibility: did price cross the trigger side within the window?
+        if order.side.value == "buy":
+            # For stop/limit BUY, require high to reach trigger; for market we assume fill possible.
+            if order.order_type.name in {"STOP", "STOP_LIMIT"} and order.stop_price is not None:
+                return any(b.high >= order.stop_price for b in window)
+            return any(True for _ in window)
+        if order.side.value == "sell":
+            if order.order_type.name in {"STOP", "STOP_LIMIT"} and order.stop_price is not None:
+                return any(b.low <= order.stop_price for b in window)
+            return any(True for _ in window)
+        return True
 
 
 def ensure_eligible(order_idx: int, current_idx: int, min_delay: int) -> bool:
