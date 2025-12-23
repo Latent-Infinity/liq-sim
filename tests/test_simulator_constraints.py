@@ -1,11 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from liq.sim.config import ProviderConfig, SimulatorConfig
-from liq.sim.simulator import Simulator
 from liq.core import Bar, OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.config import ProviderConfig, SimulatorConfig
+from liq.sim.simulator import Simulator
 
 
 def make_order(timestamp: datetime, qty: str, price: str) -> OrderRequest:
@@ -41,7 +42,7 @@ def test_position_limit_blocks_order() -> None:
         slippage_params={"base_bps": "0", "volume_impact": "0"},
     )
     sim = Simulator(provider_config=cfg, config=SimulatorConfig(max_position_pct=0.1))
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     # order value 2000 vs equity 0 cash -> will raise due to non-positive equity
     orders = [make_order(t0, qty="20", price="100")]
     bars = [make_bar(t0, "100")]
@@ -63,7 +64,7 @@ def test_rejected_orders_tracked_in_result() -> None:
         provider_config=cfg,
         config=SimulatorConfig(initial_capital=Decimal("100"), min_order_delay_bars=0),
     )
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     # Order value = 10 * 100 = 1000, but only 100 cash available
     orders = [make_order(t0, qty="10", price="100")]
     bars = [make_bar(t0, "100")]
@@ -90,8 +91,8 @@ def test_multiple_rejections_all_tracked() -> None:
         provider_config=cfg,
         config=SimulatorConfig(initial_capital=Decimal("50"), min_order_delay_bars=0),
     )
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    t1 = datetime(2024, 1, 2, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
+    t1 = datetime(2024, 1, 2, tzinfo=UTC)
     # Both orders exceed buying power
     orders = [
         make_order(t0, qty="10", price="100"),

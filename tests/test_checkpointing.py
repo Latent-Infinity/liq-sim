@@ -1,9 +1,11 @@
-from datetime import datetime, timezone
-from decimal import Decimal
 import random
+from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 from liq.sim.checkpoint import (
     CHECKPOINT_SCHEMA_VERSION,
@@ -13,8 +15,6 @@ from liq.sim.checkpoint import (
 )
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 class RandomSlippage:
@@ -55,7 +55,7 @@ def test_checkpoint_round_trip(tmp_path: Path) -> None:
     sim_cfg = SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=123)
     sim = Simulator(provider_config=cfg, config=sim_cfg)
     sim.slippage_model = RandomSlippage()
-    ts = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_order(ts)]
     bars = [make_bar(ts, "10")]
     result = sim.run(orders, bars)
@@ -110,7 +110,7 @@ def test_deterministic_seed_replay() -> None:
         slippage_model="VolumeWeighted",
     )
     sim_cfg = SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=999)
-    ts = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    ts = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_order(ts)]
     bars = [make_bar(ts, "10")]
 

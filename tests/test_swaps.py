@@ -1,12 +1,13 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
+
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 from liq.sim.accounting import AccountState, PositionLot, PositionRecord
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.financing import daily_swap
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_order(ts: datetime) -> OrderRequest:
@@ -41,8 +42,8 @@ def test_swap_applied_at_roll() -> None:
     )
     sim = Simulator(provider_config=cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000")))
 
-    t0 = datetime(2024, 1, 1, 21, 59, tzinfo=timezone.utc)
-    t1 = datetime(2024, 1, 1, 22, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 21, 59, tzinfo=UTC)
+    t1 = datetime(2024, 1, 1, 22, 1, tzinfo=UTC)
     orders = [make_order(t0)]
     bars = [make_bar(t0, "1.10"), make_bar(t1, "1.10")]
     result = sim.run(orders, bars, swap_rates={"EUR_USD": Decimal("0.05")})
@@ -52,7 +53,7 @@ def test_swap_applied_at_roll() -> None:
 
 
 def test_swap_applied_once_per_day() -> None:
-    now = datetime(2024, 1, 1, 22, 5, tzinfo=timezone.utc)
+    now = datetime(2024, 1, 1, 22, 5, tzinfo=UTC)
     acct = AccountState(cash=Decimal("1000"))
     acct.positions["EUR_USD"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("1.10"), entry_time=now)]
@@ -66,7 +67,7 @@ def test_swap_applied_once_per_day() -> None:
 
 
 def test_swap_triple_roll_on_wednesday() -> None:
-    now = datetime(2024, 1, 3, 22, 5, tzinfo=timezone.utc)  # Wednesday
+    now = datetime(2024, 1, 3, 22, 5, tzinfo=UTC)  # Wednesday
     acct = AccountState(cash=Decimal("1000"))
     acct.positions["EUR_USD"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("1.0"), entry_time=now)]

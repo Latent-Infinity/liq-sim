@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_bar(ts: datetime, price: str) -> Bar:
@@ -31,7 +32,7 @@ def test_golden_equity_curve_regression() -> None:
     sim_cfg = SimulatorConfig(initial_capital=Decimal("1000"), min_order_delay_bars=0)
     sim = Simulator(provider_config=provider_cfg, config=sim_cfg)
 
-    t0 = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
     order = OrderRequest(
         symbol="BTC-USD",
         side=OrderSide.BUY,

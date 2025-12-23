@@ -2,9 +2,93 @@
 
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class CalibrationConfig(BaseModel):
+    """Per-fold score calibration and EV thresholding configuration."""
+
+    enabled: bool = False
+    method: Literal["temperature", "platt"] = "temperature"
+
+
+class EVThresholdConfig(BaseModel):
+    """Expected-value-based threshold selection constraints."""
+
+    enabled: bool = False
+    min_precision: float | None = None
+    min_recall: float | None = None
+    min_trades: int | None = None
+    target_ev: float | None = None
+
+    @field_validator("min_precision", "min_recall", "target_ev")
+    @classmethod
+    def validate_fraction(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if v <= 0 or v >= 1:
+            raise ValueError("fractions must be in (0, 1)")
+        return v
+
+    @field_validator("min_trades")
+    @classmethod
+    def validate_min_trades(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("min_trades must be >= 0")
+        return v
+
+
+class FundingConfig(BaseModel):
+    """Scenario-based funding configuration."""
+
+    scenario: Literal["base", "elevated", "spike"] = "base"
+    enabled: bool = False
+
+
+class SlippageReportingConfig(BaseModel):
+    """Slippage percentile reporting configuration."""
+
+    percentiles: list[int] = Field(default_factory=lambda: [50, 75, 90, 95, 99])
+
+    @field_validator("percentiles")
+    @classmethod
+    def validate_percentiles(cls, v: list[int]) -> list[int]:
+        if not v:
+            raise ValueError("percentiles must not be empty")
+        if any(p <= 0 or p >= 100 for p in v):
+            raise ValueError("percentiles must be between 1 and 99")
+        return sorted(set(v))
+
+
+class RiskCapsConfig(BaseModel):
+    """Risk-cap configuration placeholders (net, pyramiding, equity floor, frequency)."""
+
+    net_position_cap_pct: float | None = None
+    pyramiding_layers: int | None = None
+    equity_floor_pct: float | None = None
+    frequency_cap_per_day: int | None = None
+
+    @field_validator("net_position_cap_pct", "equity_floor_pct")
+    @classmethod
+    def validate_pct(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if v <= 0 or v >= 1:
+            raise ValueError("percentages must be in (0, 1)")
+        return v
+
+    @field_validator("pyramiding_layers", "frequency_cap_per_day")
+    @classmethod
+    def validate_positive_int(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        if v <= 0:
+            raise ValueError("integer limits must be > 0")
+        return v
 
 
 class SimulatorConfig(BaseModel):
@@ -15,6 +99,7 @@ class SimulatorConfig(BaseModel):
     max_daily_loss_pct: float | None = None
     max_drawdown_pct: float | None = None
     max_position_pct: float = 0.25
+    max_gross_leverage: float = 2.0
     benchmark_symbol: str | None = None
     checkpoint_interval: int = 0
     checkpoint_dir: Path = Path("./checkpoints")
@@ -27,6 +112,11 @@ class SimulatorConfig(BaseModel):
     survivorship_min_duration_days: int = 365
     enable_overfitting_warning: bool = True
     overfitting_param_trade_ratio: float = 0.1
+    calibration: CalibrationConfig = Field(default_factory=CalibrationConfig)
+    ev_thresholds: EVThresholdConfig = Field(default_factory=EVThresholdConfig)
+    funding: FundingConfig = Field(default_factory=FundingConfig)
+    slippage_reporting: SlippageReportingConfig = Field(default_factory=SlippageReportingConfig)
+    risk_caps: RiskCapsConfig = Field(default_factory=RiskCapsConfig)
 
     @field_validator("min_order_delay_bars")
     @classmethod

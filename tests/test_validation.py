@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -21,15 +21,15 @@ def test_order_ineligible_raises() -> None:
 
 
 def test_lookahead_rejected() -> None:
-    order_ts = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
-    bar_ts = datetime(2024, 1, 1, 9, 59, tzinfo=timezone.utc)
+    order_ts = datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
+    bar_ts = datetime(2024, 1, 1, 9, 59, tzinfo=UTC)
     with pytest.raises(LookAheadBiasError):
         assert_no_lookahead(order_ts, bar_ts)
 
 
 def test_valid_timestamp_no_lookahead() -> None:
-    order_ts = datetime(2024, 1, 1, 9, 59, tzinfo=timezone.utc)
-    bar_ts = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    order_ts = datetime(2024, 1, 1, 9, 59, tzinfo=UTC)
+    bar_ts = datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
     assert_no_lookahead(order_ts, bar_ts)
 
 

@@ -1,12 +1,11 @@
-from decimal import Decimal
 
 import pytest
 
 from liq.sim.config import ProviderConfig
-from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 from liq.sim.models.fee import TieredMakerTakerFee, ZeroCommissionFee
 from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
 from liq.sim.models.spread import SpreadBasedSlippage
+from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 
 
 def test_fee_model_factory_tiered() -> None:

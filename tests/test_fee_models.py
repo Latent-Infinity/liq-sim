@@ -1,10 +1,11 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from datetime import datetime, timezone
-from liq.sim.models.fee import PerShareFee, TieredMakerTakerFee, ZeroCommissionFee
 from liq.core import OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.models.fee import PerShareFee, TieredMakerTakerFee, ZeroCommissionFee
 
 
 def make_order(
@@ -22,7 +23,7 @@ def make_order(
         limit_price=Decimal(limit) if limit else (Decimal(price) if order_type == OrderType.LIMIT else None),
         stop_price=None,
         time_in_force=TimeInForce.DAY,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 

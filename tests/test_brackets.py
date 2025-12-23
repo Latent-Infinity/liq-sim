@@ -1,9 +1,10 @@
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
 
-from liq.sim.brackets import BracketState, create_brackets, process_brackets
 from liq.core import OrderRequest
 from liq.core.enums import OrderSide, OrderType
+
+from liq.sim.brackets import create_brackets, process_brackets
 
 
 def make_entry(side: OrderSide, qty: str, sl: str | None, tp: str | None) -> OrderRequest:
@@ -14,7 +15,7 @@ def make_entry(side: OrderSide, qty: str, sl: str | None, tp: str | None) -> Ord
         quantity=Decimal(qty),
         stop_price=None,
         limit_price=None,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         # stash bracket levels in metadata for creation
         metadata={"stop_loss_price": Decimal(sl) if sl else None, "take_profit_price": Decimal(tp) if tp else None},
     )

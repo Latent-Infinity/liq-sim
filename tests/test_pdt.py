@@ -1,11 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderType, TimeInForce
+
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_order(timestamp: datetime, side: str, qty: str) -> OrderRequest:
@@ -45,10 +46,10 @@ def test_pdt_blocks_when_counter_zero() -> None:
         provider_config=cfg,
         config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("100")),
     )
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     sim.account_state.day_trades_remaining = 0
     # pre-existing long position lot
-    from liq.sim.accounting import PositionRecord, PositionLot
+    from liq.sim.accounting import PositionLot, PositionRecord
     sim.account_state.positions["AAPL"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("10"), entry_time=t0)]
     )
@@ -72,9 +73,9 @@ def test_pdt_allows_and_decrements_when_available() -> None:
         provider_config=cfg,
         config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("0")),
     )
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     sim.account_state.day_trades_remaining = 1
-    from liq.sim.accounting import PositionRecord, PositionLot
+    from liq.sim.accounting import PositionLot, PositionRecord
     sim.account_state.positions["AAPL"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("10"), entry_time=t0)]
     )

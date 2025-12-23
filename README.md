@@ -4,6 +4,8 @@ Execution simulation layer for the LIQ Stack. Scope: simulate broker-specific ex
 
 Status: Phases 0–10 complete (scaffolding through CLI). See `docs/IMPLEMENTATION_PLAN.md` for the phased TDD roadmap aligned to the PRD.
 
+Recent additions: funding scenarios (base/elevated/spike) charged during runs, slippage percentile reporting in `SimulationResult.slippage_stats`, and additional risk caps (frequency, equity floor, net/pyramiding checks) aligned with `liq-risk`.
+
 ## Installation
 
 ```bash

@@ -1,11 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from liq.sim.config import ProviderConfig, SimulatorConfig
-from liq.sim.simulator import Simulator
 from liq.core import Bar, OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.config import ProviderConfig, SimulatorConfig
+from liq.sim.simulator import Simulator
 
 
 def make_order(ts: datetime, qty: str, price: str) -> OrderRequest:
@@ -41,7 +42,7 @@ def test_buying_power_blocks_when_insufficient() -> None:
         slippage_params={"base_bps": "0", "volume_impact": "0"},
     )
     sim = Simulator(provider_config=cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("0")))
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_order(t0, qty="2", price="100")]
     bars = [make_bar(t0, "100")]
 

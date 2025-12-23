@@ -1,9 +1,8 @@
-from decimal import Decimal
 
 from liq.sim.config import ProviderConfig
-from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 from liq.sim.models.fee import PerShareFee
 from liq.sim.models.spread import SpreadBasedSlippage
+from liq.sim.providers import fee_model_from_config, slippage_model_from_config
 
 
 def test_per_share_factory() -> None:

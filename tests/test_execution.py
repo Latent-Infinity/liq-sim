@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from liq.sim.execution import match_order
 from liq.core import Bar, OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.execution import match_order
 
 
 def make_order(
@@ -24,14 +25,14 @@ def make_order(
         limit_price=Decimal(limit) if limit else None,
         stop_price=Decimal(stop) if stop else None,
         time_in_force=TimeInForce.DAY,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 
 def make_bar(open_price: str, high: str, low: str, close: str) -> Bar:
     return Bar(
         symbol="AAPL",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         open=Decimal(open_price),
         high=Decimal(high),
         low=Decimal(low),

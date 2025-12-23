@@ -16,6 +16,13 @@ from liq.sim.accounting import AccountState
 from liq.sim.brackets import BracketState, create_brackets, process_brackets
 from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.config import ProviderConfig, SimulatorConfig
+from liq.sim.funding_model import funding_charge, slippage_percentiles
+from liq.sim.risk_caps import (
+    enforce_equity_floor,
+    enforce_frequency_cap,
+    enforce_net_position_cap,
+    enforce_pyramiding_limit,
+)
 from liq.sim.constraints import (
     ConstraintViolation,
     check_buying_power,
@@ -48,6 +55,8 @@ class SimulationResult:
     portfolio_history: list[Decimal]  # equity per bar (legacy alias)
     equity_curve: list[tuple[datetime, Decimal]]
     portfolio_states: list[PortfolioState]
+    slippage_stats: dict[str, float] = field(default_factory=dict)
+    funding_charged: Decimal = Decimal("0")
     rejected_orders: list[RejectedOrder] = field(default_factory=list)
 
 
@@ -65,6 +74,8 @@ class Simulator:
     kill_switch_engaged: bool = False
     current_day: datetime | None = None
     active_brackets: list[BracketState] = field(default_factory=list)
+    trades_today: int = 0
+    starting_equity: Decimal = Decimal("0")
 
     def __post_init__(self) -> None:
         self.fee_model = fee_model_from_config(self.provider_config)
@@ -77,6 +88,7 @@ class Simulator:
         init_equity = self.account_state.cash + self.account_state.unsettled_cash
         self.peak_equity = init_equity
         self.daily_start_equity = init_equity
+        self.starting_equity = init_equity
         if self.provider_config.pdt_enabled and self.account_state.day_trades_remaining is None:
             # Simplified PDT counter (3 day trades default)
             self.account_state.day_trades_remaining = 3
@@ -137,6 +149,8 @@ class Simulator:
         equity_curve: list[tuple[datetime, Decimal]] = []
         portfolio_states: list[PortfolioState] = []
         rejected_orders: list[RejectedOrder] = []
+        funding_total = Decimal("0")
+        slippage_samples: list[float] = []
 
         logger.info(
             "Simulation started",
@@ -172,6 +186,7 @@ class Simulator:
                 )
                 self.daily_start_equity = snapshot.equity
                 self.current_day = bar.timestamp
+                self.trades_today = 0
 
             self.account_state.process_settlement(bar.timestamp)
             # apply daily swaps if applicable (for providers with financing)
@@ -180,12 +195,39 @@ class Simulator:
                 self.account_state.apply_daily_swap(
                     bar.timestamp, swap_rates=swap_rates, marks=marks_for_swaps, fx_rates=fx_rates
                 )
+            # funding charges per day when enabled
+            if self.config.funding.enabled:
+                for symbol, pos in self.account_state.positions.items():
+                    if pos.net_quantity == 0:
+                        continue
+                    mark = bar.close
+                    notional = abs(pos.net_quantity * mark)
+                    charge = Decimal(str(funding_charge(float(notional), days=1, scenario=self.config.funding.scenario)))
+                    if pos.net_quantity > 0:
+                        self.account_state.cash -= charge
+                        pos.realized_pnl -= charge
+                    else:
+                        self.account_state.cash += charge
+                        pos.realized_pnl += charge
+                    funding_total += charge
             # compute equity snapshot at bar open for drawdown/daily loss checks
             marks_open = dict.fromkeys(self.account_state.positions.keys(), bar.open)
             snapshot_open = self.account_state.to_portfolio_state(
                 marks=marks_open, timestamp=bar.timestamp, fx_rates=fx_rates
             )
             current_equity = snapshot_open.equity
+            if current_equity <= 0:
+                # Floor equity at zero to avoid negative equity artifacts
+                current_equity = Decimal("0")
+                snapshot_open = snapshot_open.model_copy(update={"equity": current_equity})
+                # Hard stop: no trading with non-positive equity
+                equity_curve.append((bar.timestamp, current_equity))
+                portfolio_states.append(snapshot_open)
+                logger.warning(
+                    "Equity non-positive; halting simulation",
+                    extra={"equity": str(current_equity), "timestamp": bar.timestamp.isoformat()},
+                )
+                break
             # update peak
             if current_equity > self.peak_equity:
                 self.peak_equity = current_equity
@@ -209,17 +251,40 @@ class Simulator:
                 active_orders.append(order)
 
             executed_orders: list[OrderRequest] = []
-            # Reuse a single portfolio snapshot and mark cache per symbol for this bar.
-            pre_marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
-            portfolio_snapshot = self.account_state.to_portfolio_state(
-                marks=pre_marks, timestamp=bar.timestamp, fx_rates=fx_rates
-            )
+            # Mark cache per symbol; portfolio snapshot recomputed per order to reflect intra-bar fills.
             mark_cache: dict[str, Decimal] = {}
             for order in list(active_orders):
                 mark_for_constraints = mark_cache.get(order.symbol)
                 if mark_for_constraints is None:
                     mark_for_constraints = self._mark_in_account_ccy(bar.open, order.symbol, fx_rates)
                     mark_cache[order.symbol] = mark_for_constraints
+                # Fresh snapshot using current account state (after any earlier fills this bar)
+                pre_marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
+                portfolio_snapshot = self.account_state.to_portfolio_state(
+                    marks=pre_marks, timestamp=bar.timestamp, fx_rates=fx_rates
+                )
+                # Risk caps: net exposure, equity floor, frequency, pyramiding
+                net_exposure = sum(
+                    (abs(p.market_value) for p in portfolio_snapshot.positions.values()), Decimal("0")
+                )
+                if not enforce_net_position_cap(
+                    net_exposure, portfolio_snapshot.equity, self.config.risk_caps.net_position_cap_pct
+                ):
+                    rejected_orders.append(RejectedOrder(order=order, reason="Net position cap", timestamp=bar.timestamp))
+                    continue
+                if not enforce_equity_floor(
+                    portfolio_snapshot.equity, self.config.risk_caps.equity_floor_pct, self.starting_equity
+                ):
+                    rejected_orders.append(RejectedOrder(order=order, reason="Equity floor breached", timestamp=bar.timestamp))
+                    continue
+                if not enforce_frequency_cap(self.trades_today, self.config.risk_caps.frequency_cap_per_day):
+                    rejected_orders.append(RejectedOrder(order=order, reason="Frequency cap reached", timestamp=bar.timestamp))
+                    continue
+                if not enforce_pyramiding_limit(
+                    current_layers=1, max_layers=self.config.risk_caps.pyramiding_layers
+                ):
+                    rejected_orders.append(RejectedOrder(order=order, reason="Pyramiding cap", timestamp=bar.timestamp))
+                    continue
                 # Kill-switch: block exposure-increasing (buys) when engaged
                 try:
                     check_kill_switch(self.kill_switch_engaged, order)
@@ -261,6 +326,14 @@ class Simulator:
                         mark_price=mark_for_constraints,
                         initial_margin_rate=self.provider_config.initial_margin_rate,
                     )
+                    from liq.sim.constraints import check_gross_leverage
+
+                    check_gross_leverage(
+                        order,
+                        portfolio_snapshot,
+                        mark_price=mark_for_constraints,
+                        max_gross_leverage=self.config.max_gross_leverage,
+                    )
                     check_short_permission(
                         order,
                         portfolio_snapshot,
@@ -301,11 +374,13 @@ class Simulator:
                     timestamp=bar.timestamp,
                 )
                 if fill:
+                    slippage_samples.append(float(slippage))
                     executed_orders.append(order)
                     if is_day_trade and self.account_state.day_trades_remaining is not None:
                         self.account_state.day_trades_remaining = max(
                             0, self.account_state.day_trades_remaining - 1
                         )
+                    self.trades_today += 1
                     realized = self.account_state.apply_fill(
                         fill,
                         settlement_days=self.provider_config.settlement_days,
@@ -366,6 +441,8 @@ class Simulator:
                             fx_rates=fx_rates,
                         )
                         fills.append(fill.model_copy(update={"realized_pnl": realized}))
+                        slippage_samples.append(float(slippage))
+                        self.trades_today += 1
                 else:
                     remaining_brackets.append(bracket)
             self.active_brackets = remaining_brackets
@@ -403,6 +480,8 @@ class Simulator:
             portfolio_history=portfolio_history,
             equity_curve=equity_curve,
             portfolio_states=portfolio_states,
+            slippage_stats=slippage_percentiles(slippage_samples, self.config.slippage_reporting.percentiles),
+            funding_charged=funding_total,
             rejected_orders=rejected_orders,
         )
 

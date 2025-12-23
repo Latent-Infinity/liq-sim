@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
-from liq.sim.config import ProviderConfig, SimulatorConfig
-from liq.sim.simulator import Simulator
 from liq.core import Bar, OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.config import ProviderConfig, SimulatorConfig
+from liq.sim.simulator import Simulator
 
 
 def make_day_order(ts: datetime, price: str) -> OrderRequest:
@@ -43,7 +44,7 @@ def test_day_order_expires_after_bar() -> None:
     )
     sim = Simulator(provider_config=cfg, config=SimulatorConfig(min_order_delay_bars=0))
 
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_day_order(t0, price="100")]
     bars = [
         make_bar(t0, "90"),  # should fill (limit buy)

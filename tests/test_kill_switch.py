@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-
-from liq.sim.constraints import ConstraintViolation, check_kill_switch
 from liq.core import OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.constraints import ConstraintViolation, check_kill_switch
 
 
 def make_order(side: str) -> OrderRequest:
@@ -17,7 +17,7 @@ def make_order(side: str) -> OrderRequest:
         order_type=OrderType.MARKET,
         quantity=Decimal("1"),
         time_in_force=TimeInForce.DAY,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 

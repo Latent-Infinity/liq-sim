@@ -1,11 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderType, TimeInForce
+
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_order(timestamp: datetime, side: str, qty: str) -> OrderRequest:
@@ -49,7 +50,7 @@ def test_kill_switch_blocks_buys_after_drawdown() -> None:
     sim.daily_start_equity = Decimal("100")
     sim.account_state.cash = Decimal("50")
 
-    t0 = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_order(t0, side="buy", qty="1")]
     bars = [make_bar(t0, "10")]
 

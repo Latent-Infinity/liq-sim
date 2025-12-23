@@ -1,6 +1,5 @@
+from datetime import UTC, datetime
 from decimal import Decimal
-
-from datetime import datetime, timezone
 
 from liq.sim.financing import borrow_cost, daily_swap, swap_applicable, swap_multiplier_for_weekday
 
@@ -16,17 +15,17 @@ def test_borrow_cost_alias() -> None:
 
 
 def test_swap_applicable_at_roll() -> None:
-    ts = datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc)
+    ts = datetime(2024, 1, 1, 22, 0, tzinfo=UTC)
     assert swap_applicable(ts)
 
 
 def test_swap_applicable_handles_dst_shift() -> None:
-    summer_before = datetime(2024, 7, 1, 20, 59, tzinfo=timezone.utc)
-    summer_after = datetime(2024, 7, 1, 21, 0, tzinfo=timezone.utc)
+    summer_before = datetime(2024, 7, 1, 20, 59, tzinfo=UTC)
+    summer_after = datetime(2024, 7, 1, 21, 0, tzinfo=UTC)
     assert not swap_applicable(summer_before)
     assert swap_applicable(summer_after)
 
 
 def test_swap_multiplier_wednesday() -> None:
-    ts = datetime(2024, 1, 3, 12, 0, tzinfo=timezone.utc)  # Wednesday
+    ts = datetime(2024, 1, 3, 12, 0, tzinfo=UTC)  # Wednesday
     assert swap_multiplier_for_weekday(ts) == 3

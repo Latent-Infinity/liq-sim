@@ -1,12 +1,13 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
-from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
-from liq.sim.models.spread import SpreadBasedSlippage
 from liq.core import Bar, OrderRequest
 from liq.core.enums import OrderSide, OrderType, TimeInForce
+
+from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
+from liq.sim.models.spread import SpreadBasedSlippage
 
 
 def make_order(qty: str) -> OrderRequest:
@@ -17,14 +18,14 @@ def make_order(qty: str) -> OrderRequest:
         order_type=OrderType.MARKET,
         quantity=Decimal(qty),
         time_in_force=TimeInForce.DAY,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 
 def make_bar(open_price: str, high: str, low: str, close: str, volume: str) -> Bar:
     return Bar(
         symbol="AAPL",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         open=Decimal(open_price),
         high=Decimal(high),
         low=Decimal(low),

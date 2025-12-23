@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
+from liq.core import Bar, OrderRequest
+from liq.core.enums import OrderType, TimeInForce
+
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
-from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_order(timestamp: datetime, side: str, qty: str, limit: str | None = None) -> OrderRequest:
@@ -45,7 +46,7 @@ def test_simulator_executes_with_delay_and_fees() -> None:
     )
     sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=1))
 
-    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
     orders = [
         make_order(t0, side="buy", qty="1", limit="100"),
     ]
@@ -73,9 +74,9 @@ def test_simulator_honors_settlement_days() -> None:
     )
     sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("100")))
 
-    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
     # seed a long position to sell
-    from liq.sim.accounting import PositionRecord, PositionLot
+    from liq.sim.accounting import PositionLot, PositionRecord
     sim.account_state.positions["AAPL"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("10"), entry_time=t0)]
     )
@@ -102,7 +103,7 @@ def test_simulator_outputs_equity_curve_with_timestamps() -> None:
         short_enabled=True,
     )
     sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0))
-    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
     orders = [make_order(t0, side="buy", qty="1", limit="100")]
     bars = [
         make_bar(t0, "100", "105", "99", "102"),
@@ -124,7 +125,7 @@ def test_fills_include_realized_pnl_on_close() -> None:
         short_enabled=True,
     )
     sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0))
-    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
     buy = make_order(t0, side="buy", qty="1", limit="100")
     sell = make_order(t0 + timedelta(minutes=1), side="sell", qty="1", limit="110")
     bars = [
@@ -150,7 +151,7 @@ def test_final_equity_matches_pnl_long_and_short() -> None:
         provider_config=provider_cfg,
         config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000")),
     )
-    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
     bars = [
         make_bar(t0, "100", "101", "99", "100"),  # enter long at 100
         make_bar(t0 + timedelta(minutes=1), "110", "111", "109", "110"),  # exit long at 110 (+10)

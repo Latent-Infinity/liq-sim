@@ -1,20 +1,19 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from liq.core import OrderRequest, PortfolioState
+from liq.core.enums import OrderType
 
 from liq.sim.constraints import (
     ConstraintViolation,
     check_buying_power,
     check_margin,
     check_pdt,
-    check_short_permission,
     check_position_limit,
+    check_short_permission,
 )
-from liq.core import PortfolioState
-from liq.core import OrderRequest
-from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 
 def make_portfolio(equity: Decimal, day_trades_remaining: int | None = None) -> PortfolioState:
@@ -26,7 +25,7 @@ def make_portfolio(equity: Decimal, day_trades_remaining: int | None = None) -> 
         buying_power=None,
         margin_used=None,
         day_trades_remaining=day_trades_remaining,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 

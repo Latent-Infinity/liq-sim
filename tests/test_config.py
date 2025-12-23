@@ -3,7 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from liq.sim.config import ProviderConfig, SimulatorConfig
+from liq.sim.config import (
+    CalibrationConfig,
+    EVThresholdConfig,
+    FundingConfig,
+    ProviderConfig,
+    RiskCapsConfig,
+    SimulatorConfig,
+    SlippageReportingConfig,
+)
 
 
 class TestSimulatorConfig:
@@ -34,6 +42,35 @@ class TestSimulatorConfig:
     def test_log_format_validation(self) -> None:
         with pytest.raises(ValueError):
             SimulatorConfig(log_format="xml")
+
+    def test_nested_configs_present(self) -> None:
+        cfg = SimulatorConfig()
+        assert isinstance(cfg.calibration, CalibrationConfig)
+        assert isinstance(cfg.ev_thresholds, EVThresholdConfig)
+        assert isinstance(cfg.funding, FundingConfig)
+        assert isinstance(cfg.slippage_reporting, SlippageReportingConfig)
+        assert isinstance(cfg.risk_caps, RiskCapsConfig)
+
+    def test_slippage_percentiles_validation(self) -> None:
+        with pytest.raises(ValueError):
+            SlippageReportingConfig(percentiles=[0, 101])
+        cfg = SlippageReportingConfig(percentiles=[95, 50, 95])
+        assert cfg.percentiles == [50, 95]
+
+    def test_ev_threshold_validation(self) -> None:
+        with pytest.raises(ValueError):
+            EVThresholdConfig(min_precision=1.5)
+        with pytest.raises(ValueError):
+            EVThresholdConfig(min_recall=-0.1)
+        cfg = EVThresholdConfig(min_trades=0, target_ev=0.2)
+        assert cfg.min_trades == 0
+        assert cfg.target_ev == 0.2
+
+    def test_risk_caps_validation(self) -> None:
+        with pytest.raises(ValueError):
+            RiskCapsConfig(net_position_cap_pct=1.1)
+        with pytest.raises(ValueError):
+            RiskCapsConfig(pyramiding_layers=0)
 
 
 class TestProviderConfig:

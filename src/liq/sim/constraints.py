@@ -102,6 +102,30 @@ def check_position_limit(
         )
 
 
+def check_gross_leverage(
+    order: OrderRequest,
+    portfolio: PortfolioState,
+    mark_price: Decimal,
+    max_gross_leverage: float,
+) -> None:
+    """Ensure projected gross exposure does not exceed leverage cap."""
+    equity = portfolio.equity if hasattr(portfolio, "equity") else portfolio.cash
+    if equity <= 0:
+        raise ConstraintViolation(f"Cannot trade with non-positive equity: {equity}")
+    gross = sum((abs(p.market_value) for p in portfolio.positions.values()), Decimal("0"))
+    order_value = order.quantity * mark_price
+    projected_gross = gross
+    side_val = str(order.side).lower()
+    if side_val.endswith("buy") or side_val.endswith("sell"):
+        projected_gross += order_value
+    cap = Decimal(str(max_gross_leverage)) * equity
+    if projected_gross > cap:
+        raise ConstraintViolation(
+            f"Gross leverage exceeded: projected {projected_gross} > cap {cap} "
+            f"({max_gross_leverage}x equity {equity})"
+        )
+
+
 def check_pdt(
     portfolio: PortfolioState,
     is_day_trade: bool,
