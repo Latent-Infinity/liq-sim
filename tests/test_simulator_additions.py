@@ -1,8 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import polars as pl
-import pytest
 from liq.core import Bar, OrderRequest, OrderSide, OrderType
 
 from liq.sim.config import ProviderConfig, SimulatorConfig

@@ -7,7 +7,8 @@ interface-only in Phase 0.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Protocol, Sequence
+from collections.abc import Sequence
+from typing import Protocol
 
 import polars as pl
 

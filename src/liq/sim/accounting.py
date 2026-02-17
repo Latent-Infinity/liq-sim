@@ -271,7 +271,6 @@ class AccountState:
         """Convert to an immutable PortfolioState using provided mark prices."""
         positions: dict[str, Position] = {}
         total_realized = Decimal("0")
-        equity = self.cash + self.unsettled_cash
         for symbol, rec in self.positions.items():
             qty = rec.net_quantity
             mark = marks.get(symbol, rec.avg_entry_price)
@@ -303,7 +302,6 @@ class AccountState:
                 current_price=mark_for_state,
             )
             total_realized += rec.realized_pnl
-            equity += mark_notional
 
         return PortfolioState(
             cash=self.cash,
@@ -314,6 +312,4 @@ class AccountState:
             margin_used=None,
             day_trades_remaining=self.day_trades_remaining,
             timestamp=timestamp,
-            # Override equity with signed mark-to-market
-            equity=equity,
         )

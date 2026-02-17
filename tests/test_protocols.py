@@ -1,7 +1,6 @@
 """Contract checks for simulation protocols (Phase 0 interfaces)."""
 
 import polars as pl
-import pytest
 
 from liq.sim import protocols
 

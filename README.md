@@ -9,12 +9,12 @@ Recent additions: funding scenarios (base/elevated/spike) charged during runs, s
 ## Installation
 
 ```bash
-pip install liq-sim
+uv pip install liq-sim
 ```
 
 For development:
 ```bash
-pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 ```
 
 ## Quick Start
@@ -93,13 +93,13 @@ A Typer + Rich CLI is available for quick runs and config validation:
 
 ```bash
 # Validate configs
-python -m liq.sim.cli validate-config provider.json simulator.json
+uv run python -m liq.sim.cli validate-config provider.json simulator.json
 
 # Run a simulation and emit a checkpoint
-python -m liq.sim.cli run orders.json bars.json provider.json simulator.json --checkpoint-out chk.msgpack
+uv run python -m liq.sim.cli run orders.json bars.json provider.json simulator.json --checkpoint-out chk.msgpack
 
 # Resume from checkpoint
-python -m liq.sim.cli run orders.json bars.json provider.json simulator.json --checkpoint-in chk.msgpack
+uv run python -m liq.sim.cli run orders.json bars.json provider.json simulator.json --checkpoint-in chk.msgpack
 ```
 
 - `validate-config`: ensures provider and simulator configs conform to the PRD/liq-core models.

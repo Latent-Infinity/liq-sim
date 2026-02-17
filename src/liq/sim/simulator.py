@@ -16,13 +16,6 @@ from liq.sim.accounting import AccountState
 from liq.sim.brackets import BracketState, create_brackets, process_brackets
 from liq.sim.checkpoint import SimulationCheckpoint, create_checkpoint
 from liq.sim.config import ProviderConfig, SimulatorConfig
-from liq.sim.funding_model import funding_charge, slippage_percentiles
-from liq.sim.risk_caps import (
-    enforce_equity_floor,
-    enforce_frequency_cap,
-    enforce_net_position_cap,
-    enforce_pyramiding_limit,
-)
 from liq.sim.constraints import (
     ConstraintViolation,
     check_buying_power,
@@ -33,8 +26,15 @@ from liq.sim.constraints import (
     check_short_permission,
 )
 from liq.sim.execution import match_order
+from liq.sim.funding_model import funding_charge, slippage_percentiles
 from liq.sim.fx import convert_to_usd
 from liq.sim.providers import fee_model_from_config, slippage_model_from_config
+from liq.sim.risk_caps import (
+    enforce_equity_floor,
+    enforce_frequency_cap,
+    enforce_net_position_cap,
+    enforce_pyramiding_limit,
+)
 from liq.sim.validation import assert_no_lookahead, ensure_order_eligible
 
 logger = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ class Simulator:
                 )
             # funding charges per day when enabled
             if self.config.funding.enabled:
-                for symbol, pos in self.account_state.positions.items():
+                for _symbol, pos in self.account_state.positions.items():
                     if pos.net_quantity == 0:
                         continue
                     mark = bar.close

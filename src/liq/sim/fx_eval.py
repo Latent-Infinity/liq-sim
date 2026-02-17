@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
-from typing import Any
 
 
 def summarize_fx_performance(
@@ -57,13 +56,13 @@ def turnover_from_positions(
     pos = list(positions)
     if len(pos) < 2:
         return 0.0
-    deltas = [abs(curr - prev) for prev, curr in zip(pos, pos[1:])]
+    deltas = [abs(curr - prev) for prev, curr in zip(pos, pos[1:], strict=False)]
     return sum(deltas) / len(deltas)
 
 
 def _pct_returns(equity: list[float]) -> list[float]:
     returns = []
-    for prev, curr in zip(equity, equity[1:]):
+    for prev, curr in zip(equity, equity[1:], strict=False):
         if prev == 0:
             returns.append(0.0)
         else:

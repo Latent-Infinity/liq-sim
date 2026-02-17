@@ -24,10 +24,10 @@ from liq.sim.checkpoint import CheckpointFormatError, SimulationCheckpoint
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.exceptions import LookAheadBiasError
 from liq.sim.execution import match_order
+from liq.sim.fx_eval import summarize_fx_performance, turnover_from_positions
 from liq.sim.models.fee import TieredMakerTakerFee, ZeroCommissionFee
 from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
 from liq.sim.simulator import RejectedOrder, SimulationResult, Simulator
 from liq.sim.validation import assert_no_lookahead, is_order_eligible
-from liq.sim.fx_eval import summarize_fx_performance, turnover_from_positions
 
 __version__ = "0.1.0"
