@@ -4,14 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "liq-sim"
-version = "0.1.0"
+version = "0.1.1"
 description = "LIQ Stack: execution simulation layer"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [{ name = "Latent Infinity Solutions" }]
 dependencies = [
-    "liq-core>=0.1.0",
+    "liq-core>=0.1.1",
+    "numpy>=1.26",
     "pydantic>=2.10",
     "msgspec>=0.18",
 ]

@@ -213,3 +213,16 @@ result = resumed_sim.run(remaining_orders, remaining_bars)
 ```
 
 Checkpoints use MessagePack format (`.msgpack` extension) for security and efficiency. See `docs/CHECKPOINT.md` for format details.
+
+## Failure Modes (Phase 6 hardening)
+
+| Failure | Exception | Trigger | Remediation |
+|---------|-----------|---------|-------------|
+| Missing FX rate | `KeyError` | Direct or cross FX pair not in rate data | Ensure FX rate coverage for all instrument pairs before simulation |
+| Look-ahead bias | `LookAheadBiasError(ValueError)` | Order uses current/future bar information | Fix strategy logic; detected by `min_order_delay_bars` validation |
+| Ineligible order | `IneligibleOrderError(ValueError)` | Order not eligible due to delay constraints | Increase delay or adjust order timing |
+| Invalid CVaR alpha | `ValueError` | `alpha` not in `(0, 1)` | Use valid alpha (e.g., 0.05 for 5% CVaR) |
+| Checkpoint corruption | `CheckpointFormatError` | Schema mismatch, config hash mismatch, decode error | Delete checkpoint, re-run from scratch |
+| Config validation | `ValueError` | Various: negative delays, invalid percentiles, bad fee/slippage model | Fix config values at construction time (fail-fast) |
+
+All configuration errors are raised at construction time (fail-fast pattern). `LookAheadBiasError` and `IneligibleOrderError` are subclasses of `ValueError` for easy catch-all handling.
