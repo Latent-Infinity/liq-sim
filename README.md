@@ -214,7 +214,7 @@ result = resumed_sim.run(remaining_orders, remaining_bars)
 
 Checkpoints use MessagePack format (`.msgpack` extension) for security and efficiency. See `docs/CHECKPOINT.md` for format details.
 
-## Failure Modes (Phase 6 hardening)
+## Failure Modes (Stage 6 hardening)
 
 | Failure | Exception | Trigger | Remediation |
 |---------|-----------|---------|-------------|

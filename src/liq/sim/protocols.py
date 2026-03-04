@@ -1,7 +1,7 @@
 """Protocol and interface definitions for extensible simulation components.
 
 These are placeholders for upcoming implementations and are intentionally
-interface-only in Phase 0.
+interface-only in Stage 0.
 """
 
 from __future__ import annotations

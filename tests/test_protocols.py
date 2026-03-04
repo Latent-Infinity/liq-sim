@@ -1,4 +1,4 @@
-"""Contract checks for simulation protocols (Phase 0 interfaces)."""
+"""Contract checks for simulation protocols (Stage 0 interfaces)."""
 
 import polars as pl
 
