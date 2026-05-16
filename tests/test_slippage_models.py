@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from decimal import Decimal
-from types import SimpleNamespace
 from uuid import uuid4
 
 from liq.core import Bar, OrderRequest
@@ -8,6 +7,13 @@ from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 from liq.sim.models.slippage import PFOFSlippage, VolumeWeightedSlippage
 from liq.sim.models.spread import SpreadBasedSlippage
+
+
+class ExplicitSpreadBar:
+    def __init__(self, spread: Decimal, high: Decimal, low: Decimal) -> None:
+        self.spread = spread
+        self.high = high
+        self.low = low
 
 
 def make_order(qty: str) -> OrderRequest:
@@ -73,7 +79,7 @@ def test_spread_based_slippage_uses_bar_spread() -> None:
 
 def test_spread_based_slippage_prefers_explicit_spread() -> None:
     model = SpreadBasedSlippage()
-    bar = SimpleNamespace(spread=Decimal("0.8"), high=Decimal("0"), low=Decimal("0"))
+    bar = ExplicitSpreadBar(spread=Decimal("0.8"), high=Decimal("0"), low=Decimal("0"))
     order = make_order("1")
     slippage = model.calculate(order, bar)
     assert slippage == Decimal("0.4")
