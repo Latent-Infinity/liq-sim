@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable
 
-
 TRACE_SCHEMA_VERSION = "1.0"
 DEFAULT_MAX_TRACE_LENGTH = 512
 

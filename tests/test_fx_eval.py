@@ -1,3 +1,5 @@
+from typing import cast
+
 from liq.sim.fx_eval import (
     build_trace_payload,
     capacity_proxy,
@@ -57,10 +59,16 @@ def test_tail_stability_and_capacity_metrics() -> None:
 
 def test_trace_payload_defaults_and_downsample() -> None:
     payload = build_trace_payload(signal=[1.0] * 2, max_length=4)
+    signal_trace = cast(dict[str, object], payload["signal_trace"])
+    position_trace = cast(dict[str, object], payload["position_trace"])
+    pnl_trace = cast(dict[str, object], payload["pnl_trace"])
+    assert isinstance(signal_trace, dict)
+    assert isinstance(position_trace, dict)
+    assert isinstance(pnl_trace, dict)
     assert payload["schema_version"] == "1.0"
-    assert payload["signal_trace"]["length"] == 2
-    assert payload["position_trace"]["values"] == [0.0]
-    assert payload["pnl_trace"]["values"] == [0.0]
+    assert signal_trace["length"] == 2
+    assert position_trace["values"] == [0.0]
+    assert pnl_trace["values"] == [0.0]
 
 
 def test_tail_stability_violations_when_threshold_exceeded() -> None:
