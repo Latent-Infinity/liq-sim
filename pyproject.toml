@@ -15,6 +15,9 @@ dependencies = [
     "numpy>=2.0",
     "pydantic>=2.10",
     "msgspec>=0.18",
+    "polars>=0.20",
+    "typer>=0.12",
+    "rich>=13.0",
 ]
 
 [project.optional-dependencies]
