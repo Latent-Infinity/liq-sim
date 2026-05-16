@@ -63,17 +63,19 @@ def match_order(
         return _fill(bar.open - slippage)
 
     if effective_type == OrderType.LIMIT:
+        if limit_price is None:
+            return None
         if order.side == OrderSide.BUY:
-            if bar.low <= (limit_price or Decimal("0")):
-                if bar.open < (limit_price or Decimal("0")):
+            if bar.low <= limit_price:
+                if bar.open < limit_price:
                     return _fill(min(bar.open, limit_price))
-                return _fill(limit_price or bar.open)
+                return _fill(limit_price)
             return None
         else:
-            if bar.high >= (limit_price or Decimal("0")):
-                if bar.open > (limit_price or Decimal("0")):
+            if bar.high >= limit_price:
+                if bar.open > limit_price:
                     return _fill(max(bar.open, limit_price))
-                return _fill(limit_price or bar.open)
+                return _fill(limit_price)
             return None
 
     if effective_type == OrderType.STOP:

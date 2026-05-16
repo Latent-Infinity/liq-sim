@@ -361,9 +361,13 @@ class Simulator:
 
                 slippage = self.slippage_model.calculate(order, bar)
                 # naive maker/taker heuristic: limits with price away from open are maker
-                is_maker = order.order_type.name == "LIMIT" and (
-                    (order.side.value == "buy" and order.limit_price and order.limit_price < bar.open)
-                    or (order.side.value == "sell" and order.limit_price and order.limit_price > bar.open)
+                is_maker = bool(
+                    order.order_type.name == "LIMIT"
+                    and order.limit_price is not None
+                    and (
+                        (order.side.value == "buy" and order.limit_price < bar.open)
+                        or (order.side.value == "sell" and order.limit_price > bar.open)
+                    )
                 )
                 fill = match_order(
                     order,
@@ -508,7 +512,7 @@ class Simulator:
                     high=max(b.high for b in window_bars),
                     low=min(b.low for b in window_bars),
                     close=window_bars[-1].close,
-                    volume=sum(b.volume for b in window_bars),
+                    volume=sum((b.volume for b in window_bars), Decimal("0")),
                 )
             )
             start_idx = idx
