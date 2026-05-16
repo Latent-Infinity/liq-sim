@@ -7,7 +7,7 @@ from liq.sim import protocols
 
 def test_calibration_strategy_placeholder() -> None:
     class Dummy(protocols.CalibrationStrategy):
-        def calibrate(self, scores: pl.Series, labels: pl.Series) -> dict:  # type: ignore[override]
+        def calibrate(self, scores: pl.Series, labels: pl.Series) -> dict:
             return {"scores": scores, "labels": labels}
 
     strat = Dummy()
@@ -17,7 +17,7 @@ def test_calibration_strategy_placeholder() -> None:
 
 def test_ev_threshold_selector_placeholder() -> None:
     class Dummy(protocols.EVThresholdSelector):
-        def select(self, scores: pl.Series, labels: pl.Series) -> dict:  # type: ignore[override]
+        def select(self, scores: pl.Series, labels: pl.Series) -> dict:
             return {"threshold": 0.5, "scores": scores, "labels": labels}
 
     selector = Dummy()

@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import pytest
 from liq.core import OrderRequest, PortfolioState, Position
-from liq.core.enums import OrderType
+from liq.core.enums import OrderSide, OrderType
 
 from liq.sim.constraints import ConstraintViolation, check_gross_leverage
 
@@ -56,7 +56,7 @@ def make_buy_order(symbol: str, quantity: Decimal) -> OrderRequest:
     return OrderRequest(
         client_order_id=uuid4(),
         symbol=symbol,
-        side="buy",
+        side=OrderSide.BUY,
         order_type=OrderType.MARKET,
         quantity=quantity,
         timestamp=datetime.now(UTC),
@@ -68,7 +68,7 @@ def make_sell_order(symbol: str, quantity: Decimal) -> OrderRequest:
     return OrderRequest(
         client_order_id=uuid4(),
         symbol=symbol,
-        side="sell",
+        side=OrderSide.SELL,
         order_type=OrderType.MARKET,
         quantity=quantity,
         timestamp=datetime.now(UTC),

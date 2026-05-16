@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from liq.core import OrderRequest, PortfolioState
-from liq.core.enums import OrderType
+from liq.core.enums import OrderSide, OrderType
 
 from liq.sim.constraints import (
     ConstraintViolation,
@@ -31,18 +31,28 @@ def make_portfolio(equity: Decimal, day_trades_remaining: int | None = None) -> 
 
 def test_position_limit_rejects_when_exceeds() -> None:
     portfolio = make_portfolio(Decimal("1000"))
-    class Order:  # lightweight stand-in
-        quantity = Decimal("10")
-    order = Order()
+    order = OrderRequest(
+        client_order_id=uuid4(),
+        symbol="AAPL",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=Decimal("10"),
+        timestamp=portfolio.timestamp,
+    )
     with pytest.raises(ConstraintViolation):
         check_position_limit(order, portfolio, max_position_pct=0.1, mark_price=Decimal("20"))
 
 
 def test_position_limit_allows_within_limit() -> None:
     portfolio = make_portfolio(Decimal("1000"))
-    class Order:
-        quantity = Decimal("1")
-    order = Order()
+    order = OrderRequest(
+        client_order_id=uuid4(),
+        symbol="AAPL",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=Decimal("1"),
+        timestamp=portfolio.timestamp,
+    )
     check_position_limit(order, portfolio, max_position_pct=0.1, mark_price=Decimal("50"))
 
 
@@ -51,7 +61,7 @@ def test_buying_power_rejects_buy() -> None:
     order = OrderRequest(
         client_order_id=uuid4(),
         symbol="AAPL",
-        side="buy",
+        side=OrderSide.BUY,
         order_type=OrderType.MARKET,
         quantity=Decimal("2"),
         timestamp=portfolio.timestamp,
@@ -65,7 +75,7 @@ def test_margin_rejects_when_required_exceeds_equity() -> None:
     order = OrderRequest(
         client_order_id=uuid4(),
         symbol="AAPL",
-        side="buy",
+        side=OrderSide.BUY,
         order_type=OrderType.MARKET,
         quantity=Decimal("2"),
         timestamp=portfolio.timestamp,
@@ -91,7 +101,7 @@ def test_short_rejects_when_shorting_disallowed() -> None:
     order = OrderRequest(
         client_order_id=uuid4(),
         symbol="AAPL",
-        side="sell",
+        side=OrderSide.SELL,
         order_type=OrderType.MARKET,
         quantity=Decimal("1"),
         timestamp=portfolio.timestamp,
@@ -105,7 +115,7 @@ def test_short_requires_locate_when_configured() -> None:
     order = OrderRequest(
         client_order_id=uuid4(),
         symbol="AAPL",
-        side="sell",
+        side=OrderSide.SELL,
         order_type=OrderType.MARKET,
         quantity=Decimal("1"),
         timestamp=portfolio.timestamp,
@@ -119,7 +129,7 @@ def test_short_allows_when_locate_provided() -> None:
     order = OrderRequest(
         client_order_id=uuid4(),
         symbol="AAPL",
-        side="sell",
+        side=OrderSide.SELL,
         order_type=OrderType.MARKET,
         quantity=Decimal("1"),
         timestamp=portfolio.timestamp,
