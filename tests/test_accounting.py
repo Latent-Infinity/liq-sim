@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from liq.core import Fill
+from liq.core.enums import OrderSide
 
 from liq.sim.accounting import AccountState, PositionLot, PositionRecord
 
@@ -12,7 +13,7 @@ def make_fill(symbol: str, side: str, price: str, qty: str, ts: datetime | None 
         fill_id=uuid4(),
         client_order_id=uuid4(),
         symbol=symbol,
-        side=side,
+        side=OrderSide(side),
         quantity=Decimal(qty),
         price=Decimal(price),
         commission=Decimal("0"),

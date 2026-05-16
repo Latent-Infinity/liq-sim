@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 from liq.core import Bar, OrderRequest
-from liq.core.enums import OrderType, TimeInForce
+from liq.core.enums import OrderSide, OrderType, TimeInForce
 
 from liq.sim.config import ProviderConfig, SimulatorConfig
 from liq.sim.simulator import Simulator
@@ -13,7 +13,7 @@ def make_order(timestamp: datetime, side: str, qty: str) -> OrderRequest:
     return OrderRequest(
         client_order_id=uuid4(),
         symbol="AAPL",
-        side=side,
+        side=OrderSide(side),
         order_type=OrderType.MARKET,
         quantity=Decimal(qty),
         time_in_force=TimeInForce.DAY,
