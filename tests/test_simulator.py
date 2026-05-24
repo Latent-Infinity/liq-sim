@@ -134,6 +134,7 @@ def test_fills_include_realized_pnl_on_close() -> None:
     ]
     result = sim.run([buy, sell], bars)
     assert len(result.fills) == 2
+    assert result.fills[0].realized_pnl is None
     assert result.fills[-1].realized_pnl == Decimal("10")
 
 

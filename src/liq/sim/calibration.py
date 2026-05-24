@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from math import exp, isfinite, log
-from typing import Any, cast
 
 import polars as pl
 
@@ -18,6 +17,14 @@ class CalibrationResult:
     params: dict[str, float]
 
 
+
+def _stable_sigmoid(value: float) -> float:
+    if value >= 0.0:
+        denominator = 1.0 + exp(-value)
+        return 1.0 / denominator
+    numerator = exp(value)
+    return numerator / (1.0 + numerator)
+
 def apply_temperature_scale(scores: pl.Series, temperature: float) -> pl.Series:
     """Apply temperature scaling to probability-like scores in logit space."""
     if scores.is_empty():
@@ -29,7 +36,7 @@ def apply_temperature_scale(scores: pl.Series, temperature: float) -> pl.Series:
     for raw_score in scores.cast(pl.Float64):
         probability = min(max(float(raw_score), epsilon), 1.0 - epsilon)
         logit = log(probability / (1.0 - probability))
-        calibrated.append(1.0 / (1.0 + exp(-(logit / temp))))
+        calibrated.append(_stable_sigmoid(logit / temp))
     return pl.Series(scores.name, calibrated)
 
 
@@ -79,16 +86,86 @@ def build_threshold_grid_from_scores(
     return sorted(grid)
 
 
+_TEMP_MIN = 0.5
+_TEMP_MAX = 10.0
+
+
+def _to_logit(probability: float) -> float:
+    epsilon = 1e-6
+    p = min(max(probability, epsilon), 1.0 - epsilon)
+    return log(p / (1.0 - p))
+
+
+def _mean_nll(logits: list[float], targets: list[int], temperature: float) -> float:
+    temp = max(abs(temperature), 1e-6)
+    eps = 1e-12
+    total = 0.0
+    for logit, y in zip(logits, targets, strict=True):
+        p = min(max(_stable_sigmoid(logit / temp), eps), 1.0 - eps)
+        total += -(y * log(p) + (1 - y) * log(1.0 - p))
+    return total / len(targets)
+
+
+def _fit_temperature(logits: list[float], targets: list[int]) -> float:
+    """Temperature minimizing mean NLL, bounded to a sane range.
+
+    Coarse log-spaced scan to bracket the minimum, then golden-section
+    refinement. Bounding prevents a degenerate optimum from collapsing the
+    sigmoid to a step function (T -> 0) or flattening it to 0.5 (T -> inf) —
+    the failure mode of the previous ``temp = std(scores)`` heuristic.
+    """
+    lo, hi = _TEMP_MIN, _TEMP_MAX
+    log_lo, log_hi = log(lo), log(hi)
+    n_scan = 49
+    best_t = 1.0
+    best_nll = _mean_nll(logits, targets, 1.0)
+    for i in range(n_scan):
+        t = exp(log_lo + (log_hi - log_lo) * i / (n_scan - 1))
+        nll = _mean_nll(logits, targets, t)
+        if nll < best_nll:
+            best_nll, best_t = nll, t
+
+    step = (log_hi - log_lo) / (n_scan - 1)
+    a = max(log_lo, log(best_t) - step)
+    b = min(log_hi, log(best_t) + step)
+    inv_phi = (5.0**0.5 - 1.0) / 2.0
+    c = b - (b - a) * inv_phi
+    d = a + (b - a) * inv_phi
+    fc = _mean_nll(logits, targets, exp(c))
+    fd = _mean_nll(logits, targets, exp(d))
+    for _ in range(40):
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - (b - a) * inv_phi
+            fc = _mean_nll(logits, targets, exp(c))
+        else:
+            a, c, fc = c, d, fd
+            d = a + (b - a) * inv_phi
+            fd = _mean_nll(logits, targets, exp(d))
+    refined = exp((a + b) / 2.0)
+    if _mean_nll(logits, targets, refined) < best_nll:
+        best_t = refined
+    return float(min(max(best_t, lo), hi))
+
+
 def temperature_scale(scores: pl.Series, labels: pl.Series) -> CalibrationResult:
-    """Apply simple temperature scaling to probability scores (binary labels).
+    """Temperature-scale probability scores by fitting T to minimize NLL.
 
     Scores are treated as probabilities and scaled in logit space so calibration
-    preserves ordering without collapsing varied probabilities through clipping.
+    preserves ordering. The temperature is fit against the binary labels by
+    minimizing mean negative log-likelihood over a bounded range (proper
+    calibration objective), not derived from score dispersion. Inputs without
+    two label classes are unidentifiable, so identity (T=1.0) is returned.
     """
     if scores.is_empty() or labels.is_empty():
         return CalibrationResult(scores=scores, params={"temperature": 1.0})
-    score_std = cast(Any, scores.std())
-    temp = float(max(score_std or 1.0, 1e-6))
+    targets = [int(round(float(v))) for v in labels.cast(pl.Float64)]
+    logits = [_to_logit(float(v)) for v in scores.cast(pl.Float64)]
+    m = min(len(targets), len(logits))
+    targets, logits = targets[:m], logits[:m]
+    if m == 0 or len(set(targets)) < 2:
+        return CalibrationResult(scores=scores, params={"temperature": 1.0})
+    temp = _fit_temperature(logits, targets)
     calibrated = apply_temperature_scale(scores, temp)
     return CalibrationResult(scores=calibrated, params={"temperature": temp})
 

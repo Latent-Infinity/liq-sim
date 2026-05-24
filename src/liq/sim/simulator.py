@@ -385,13 +385,22 @@ class Simulator:
                             0, self.account_state.day_trades_remaining - 1
                         )
                     self.trades_today += 1
+                    pre_fill_position = self.account_state.positions.get(fill.symbol)
+                    pre_fill_qty = (
+                        pre_fill_position.net_quantity if pre_fill_position is not None else Decimal("0")
+                    )
+                    is_closing_fill = (fill.side.value == "sell" and pre_fill_qty > 0) or (
+                        fill.side.value == "buy" and pre_fill_qty < 0
+                    )
                     realized = self.account_state.apply_fill(
                         fill,
                         settlement_days=self.provider_config.settlement_days,
                         borrow_rate_annual=self.provider_config.borrow_rate_annual,
                         fx_rates=fx_rates,
                     )
-                    fills.append(fill.model_copy(update={"realized_pnl": realized}))
+                    fills.append(
+                        fill.model_copy(update={"realized_pnl": realized if is_closing_fill else None})
+                    )
                     logger.debug(
                         "Order filled",
                         extra={
@@ -438,13 +447,24 @@ class Simulator:
                         timestamp=bar.timestamp,
                     )
                     if fill:
+                        pre_fill_position = self.account_state.positions.get(fill.symbol)
+                        pre_fill_qty = (
+                            pre_fill_position.net_quantity
+                            if pre_fill_position is not None
+                            else Decimal("0")
+                        )
+                        is_closing_fill = (fill.side.value == "sell" and pre_fill_qty > 0) or (
+                            fill.side.value == "buy" and pre_fill_qty < 0
+                        )
                         realized = self.account_state.apply_fill(
                             fill,
                             settlement_days=self.provider_config.settlement_days,
                             borrow_rate_annual=self.provider_config.borrow_rate_annual,
                             fx_rates=fx_rates,
                         )
-                        fills.append(fill.model_copy(update={"realized_pnl": realized}))
+                        fills.append(
+                            fill.model_copy(update={"realized_pnl": realized if is_closing_fill else None})
+                        )
                         slippage_samples.append(float(slippage))
                         self.trades_today += 1
                 else:
