@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from liq.sim.execution import FillPolicy
+
 
 class CalibrationConfig(BaseModel):
     """Per-fold score calibration and EV thresholding configuration."""
@@ -110,6 +112,7 @@ class SimulatorConfig(BaseModel):
     log_format: str = "text"  # "text" or "json"
     enable_survivorship_warning: bool = True
     survivorship_min_duration_days: int = 365
+    fill_policy: FillPolicy = FillPolicy.TOUCH
     enable_overfitting_warning: bool = True
     overfitting_param_trade_ratio: float = 0.1
     calibration: CalibrationConfig = Field(default_factory=CalibrationConfig)

@@ -66,9 +66,7 @@ class Simulator:
 
     provider_config: ProviderConfig
     config: SimulatorConfig = field(default_factory=SimulatorConfig)
-    account_state: AccountState = field(
-        default_factory=lambda: AccountState(cash=Decimal("0"))
-    )
+    account_state: AccountState = field(default_factory=lambda: AccountState(cash=Decimal("0")))
     peak_equity: Decimal = Decimal("0")
     daily_start_equity: Decimal = Decimal("0")
     kill_switch_engaged: bool = False
@@ -93,7 +91,9 @@ class Simulator:
             # Simplified PDT counter (3 day trades default)
             self.account_state.day_trades_remaining = 3
 
-    def _mark_in_account_ccy(self, price: Decimal, symbol: str, fx_rates: dict[str, Decimal] | None) -> Decimal:
+    def _mark_in_account_ccy(
+        self, price: Decimal, symbol: str, fx_rates: dict[str, Decimal] | None
+    ) -> Decimal:
         """Convert a mark to account currency when possible."""
         if fx_rates and self.account_state.account_currency == "USD":
             pair = symbol.replace("-", "_")
@@ -144,7 +144,9 @@ class Simulator:
         fx_rates: dict[str, Decimal] | None = None,
         swap_rates: dict[str, Decimal] | None = None,
     ) -> SimulationResult:
-        min_delay = min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
+        min_delay = (
+            min_delay_bars if min_delay_bars is not None else self.config.min_order_delay_bars
+        )
         fills: list[Fill] = []
         equity_curve: list[tuple[datetime, Decimal]] = []
         portfolio_states: list[PortfolioState] = []
@@ -159,7 +161,9 @@ class Simulator:
                 "bar_count": len(bars),
                 "min_delay_bars": min_delay,
                 "provider": self.provider_config.name,
-                "initial_capital": str(self.config.initial_capital) if self.config.initial_capital else None,
+                "initial_capital": str(self.config.initial_capital)
+                if self.config.initial_capital
+                else None,
             },
         )
 
@@ -202,7 +206,13 @@ class Simulator:
                         continue
                     mark = bar.close
                     notional = abs(pos.net_quantity * mark)
-                    charge = Decimal(str(funding_charge(float(notional), days=1, scenario=self.config.funding.scenario)))
+                    charge = Decimal(
+                        str(
+                            funding_charge(
+                                float(notional), days=1, scenario=self.config.funding.scenario
+                            )
+                        )
+                    )
                     if pos.net_quantity > 0:
                         self.account_state.cash -= charge
                         pos.realized_pnl -= charge
@@ -233,10 +243,14 @@ class Simulator:
                 self.peak_equity = current_equity
             # kill-switch checks
             if self.config.max_drawdown_pct is not None:
-                if current_equity < self.peak_equity * (Decimal("1") - Decimal(str(self.config.max_drawdown_pct))):
+                if current_equity < self.peak_equity * (
+                    Decimal("1") - Decimal(str(self.config.max_drawdown_pct))
+                ):
                     self.kill_switch_engaged = True
             if self.config.max_daily_loss_pct is not None:
-                if current_equity < self.daily_start_equity * (Decimal("1") - Decimal(str(self.config.max_daily_loss_pct))):
+                if current_equity < self.daily_start_equity * (
+                    Decimal("1") - Decimal(str(self.config.max_daily_loss_pct))
+                ):
                     self.kill_switch_engaged = True
 
             # Activate newly eligible orders for this bar
@@ -256,7 +270,9 @@ class Simulator:
             for order in list(active_orders):
                 mark_for_constraints = mark_cache.get(order.symbol)
                 if mark_for_constraints is None:
-                    mark_for_constraints = self._mark_in_account_ccy(bar.open, order.symbol, fx_rates)
+                    mark_for_constraints = self._mark_in_account_ccy(
+                        bar.open, order.symbol, fx_rates
+                    )
                     mark_cache[order.symbol] = mark_for_constraints
                 # Fresh snapshot using current account state (after any earlier fills this bar)
                 pre_marks = dict.fromkeys(self.account_state.positions.keys(), bar.open)
@@ -265,35 +281,58 @@ class Simulator:
                 )
                 # Risk caps: net exposure, equity floor, frequency, pyramiding
                 net_exposure = sum(
-                    (abs(p.market_value) for p in portfolio_snapshot.positions.values()), Decimal("0")
+                    (abs(p.market_value) for p in portfolio_snapshot.positions.values()),
+                    Decimal("0"),
                 )
                 if not enforce_net_position_cap(
-                    net_exposure, portfolio_snapshot.equity, self.config.risk_caps.net_position_cap_pct
+                    net_exposure,
+                    portfolio_snapshot.equity,
+                    self.config.risk_caps.net_position_cap_pct,
                 ):
-                    rejected_orders.append(RejectedOrder(order=order, reason="Net position cap", timestamp=bar.timestamp))
+                    rejected_orders.append(
+                        RejectedOrder(
+                            order=order, reason="Net position cap", timestamp=bar.timestamp
+                        )
+                    )
                     continue
                 if not enforce_equity_floor(
-                    portfolio_snapshot.equity, self.config.risk_caps.equity_floor_pct, self.starting_equity
+                    portfolio_snapshot.equity,
+                    self.config.risk_caps.equity_floor_pct,
+                    self.starting_equity,
                 ):
-                    rejected_orders.append(RejectedOrder(order=order, reason="Equity floor breached", timestamp=bar.timestamp))
+                    rejected_orders.append(
+                        RejectedOrder(
+                            order=order, reason="Equity floor breached", timestamp=bar.timestamp
+                        )
+                    )
                     continue
-                if not enforce_frequency_cap(self.trades_today, self.config.risk_caps.frequency_cap_per_day):
-                    rejected_orders.append(RejectedOrder(order=order, reason="Frequency cap reached", timestamp=bar.timestamp))
+                if not enforce_frequency_cap(
+                    self.trades_today, self.config.risk_caps.frequency_cap_per_day
+                ):
+                    rejected_orders.append(
+                        RejectedOrder(
+                            order=order, reason="Frequency cap reached", timestamp=bar.timestamp
+                        )
+                    )
                     continue
                 if not enforce_pyramiding_limit(
                     current_layers=1, max_layers=self.config.risk_caps.pyramiding_layers
                 ):
-                    rejected_orders.append(RejectedOrder(order=order, reason="Pyramiding cap", timestamp=bar.timestamp))
+                    rejected_orders.append(
+                        RejectedOrder(order=order, reason="Pyramiding cap", timestamp=bar.timestamp)
+                    )
                     continue
                 # Kill-switch: block exposure-increasing (buys) when engaged
                 try:
                     check_kill_switch(self.kill_switch_engaged, order)
                 except ConstraintViolation as e:
-                    rejected_orders.append(RejectedOrder(
-                        order=order,
-                        reason=e.message,
-                        timestamp=bar.timestamp,
-                    ))
+                    rejected_orders.append(
+                        RejectedOrder(
+                            order=order,
+                            reason=e.message,
+                            timestamp=bar.timestamp,
+                        )
+                    )
                     logger.debug(
                         "Order rejected: kill-switch engaged",
                         extra={
@@ -342,11 +381,13 @@ class Simulator:
                     )
                     check_pdt(portfolio_snapshot, is_day_trade=is_day_trade)
                 except ConstraintViolation as e:
-                    rejected_orders.append(RejectedOrder(
-                        order=order,
-                        reason=e.message,
-                        timestamp=bar.timestamp,
-                    ))
+                    rejected_orders.append(
+                        RejectedOrder(
+                            order=order,
+                            reason=e.message,
+                            timestamp=bar.timestamp,
+                        )
+                    )
                     logger.debug(
                         "Order rejected: constraint violation",
                         extra={
@@ -376,6 +417,7 @@ class Simulator:
                     commission=self.fee_model.calculate(order, bar.open, is_maker=is_maker),
                     provider=self.provider_config.name,
                     timestamp=bar.timestamp,
+                    fill_policy=self.config.fill_policy,
                 )
                 if fill:
                     slippage_samples.append(float(slippage))
@@ -387,7 +429,9 @@ class Simulator:
                     self.trades_today += 1
                     pre_fill_position = self.account_state.positions.get(fill.symbol)
                     pre_fill_qty = (
-                        pre_fill_position.net_quantity if pre_fill_position is not None else Decimal("0")
+                        pre_fill_position.net_quantity
+                        if pre_fill_position is not None
+                        else Decimal("0")
                     )
                     is_closing_fill = (fill.side.value == "sell" and pre_fill_qty > 0) or (
                         fill.side.value == "buy" and pre_fill_qty < 0
@@ -399,7 +443,9 @@ class Simulator:
                         fx_rates=fx_rates,
                     )
                     fills.append(
-                        fill.model_copy(update={"realized_pnl": realized if is_closing_fill else None})
+                        fill.model_copy(
+                            update={"realized_pnl": realized if is_closing_fill else None}
+                        )
                     )
                     logger.debug(
                         "Order filled",
@@ -445,6 +491,7 @@ class Simulator:
                         commission=self.fee_model.calculate(trigger, bar.open, is_maker=False),
                         provider=self.provider_config.name,
                         timestamp=bar.timestamp,
+                        fill_policy=self.config.fill_policy,
                     )
                     if fill:
                         pre_fill_position = self.account_state.positions.get(fill.symbol)
@@ -463,7 +510,9 @@ class Simulator:
                             fx_rates=fx_rates,
                         )
                         fills.append(
-                            fill.model_copy(update={"realized_pnl": realized if is_closing_fill else None})
+                            fill.model_copy(
+                                update={"realized_pnl": realized if is_closing_fill else None}
+                            )
                         )
                         slippage_samples.append(float(slippage))
                         self.trades_today += 1
@@ -483,7 +532,9 @@ class Simulator:
                 ]
             # record equity (cash + unsettled + mark to bar close for now)
             marks = dict.fromkeys(self.account_state.positions.keys(), bar.close)
-            portfolio = self.account_state.to_portfolio_state(marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates)
+            portfolio = self.account_state.to_portfolio_state(
+                marks=marks, timestamp=bar.timestamp, fx_rates=fx_rates
+            )
             equity_curve.append((bar.timestamp, portfolio.equity))
             portfolio_states.append(portfolio)
 
@@ -504,12 +555,16 @@ class Simulator:
             portfolio_history=portfolio_history,
             equity_curve=equity_curve,
             portfolio_states=portfolio_states,
-            slippage_stats=slippage_percentiles(slippage_samples, self.config.slippage_reporting.percentiles),
+            slippage_stats=slippage_percentiles(
+                slippage_samples, self.config.slippage_reporting.percentiles
+            ),
             funding_charged=funding_total,
             rejected_orders=rejected_orders,
         )
 
-    def _aggregate_bars(self, bars: Sequence[Bar], window_minutes: int) -> list[Bar]:  # pragma: no cover (optional guarded mode)
+    def _aggregate_bars(
+        self, bars: Sequence[Bar], window_minutes: int
+    ) -> list[Bar]:  # pragma: no cover (optional guarded mode)
         """Aggregate bars into larger windows (e.g., 5m) for simulation."""
         aggregated: list[Bar] = []
         window_seconds = window_minutes * 60
@@ -538,7 +593,9 @@ class Simulator:
             start_idx = idx
         return aggregated
 
-    def _intra_bar_feasible(self, order: OrderRequest, agg_bar: Bar, original_bars: Sequence[Bar]) -> bool:  # pragma: no cover
+    def _intra_bar_feasible(
+        self, order: OrderRequest, agg_bar: Bar, original_bars: Sequence[Bar]
+    ) -> bool:  # pragma: no cover
         """Check if an order could have filled within the aggregated bar using underlying 1m bars."""
         # Identify window of original bars that make up this aggregated bar.
         window: list[Bar] = []
@@ -569,7 +626,9 @@ class Simulator:
 def ensure_eligible(order_idx: int, current_idx: int, min_delay: int) -> bool:
     """Helper to wrap ensure_order_eligible raising into bool."""
     try:
-        ensure_order_eligible(order_bar_index=order_idx, current_bar_index=current_idx, min_delay_bars=min_delay)
+        ensure_order_eligible(
+            order_bar_index=order_idx, current_bar_index=current_idx, min_delay_bars=min_delay
+        )
         return True
     except Exception:
         return False

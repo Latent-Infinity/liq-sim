@@ -72,11 +72,15 @@ def test_simulator_honors_settlement_days() -> None:
         slippage_params={"adverse_bps": "0"},
         settlement_days=1,
     )
-    sim = Simulator(provider_config=provider_cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("100")))
+    sim = Simulator(
+        provider_config=provider_cfg,
+        config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("100")),
+    )
 
     t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
     # seed a long position to sell
     from liq.sim.accounting import PositionLot, PositionRecord
+
     sim.account_state.positions["AAPL"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("10"), entry_time=t0)]
     )
@@ -160,10 +164,10 @@ def test_final_equity_matches_pnl_long_and_short() -> None:
         make_bar(t0 + timedelta(minutes=3), "100", "101", "99", "100"),  # cover short at 100 (+10)
     ]
     orders = [
-        make_order(bars[0].timestamp, side="buy", qty="1"),   # long entry
+        make_order(bars[0].timestamp, side="buy", qty="1"),  # long entry
         make_order(bars[1].timestamp, side="sell", qty="1"),  # long exit
         make_order(bars[2].timestamp, side="sell", qty="1"),  # short entry
-        make_order(bars[3].timestamp, side="buy", qty="1"),   # short cover
+        make_order(bars[3].timestamp, side="buy", qty="1"),  # short cover
     ]
 
     result = sim.run(orders, bars)
@@ -171,3 +175,46 @@ def test_final_equity_matches_pnl_long_and_short() -> None:
     # Two trades each earn 10 with zero fees/slippage
     assert result.equity_curve[-1][1] == Decimal("1020")
     assert result.portfolio_history[-1] == Decimal("1020")
+
+
+def _touch_provider_cfg() -> ProviderConfig:
+    return ProviderConfig(
+        name="coinbase",
+        asset_classes=["crypto"],
+        fee_model="TieredMakerTaker",
+        fee_params={"maker_bps": "2", "taker_bps": "10"},
+        slippage_model="VolumeWeighted",
+        slippage_params={"base_bps": "0", "volume_impact": "0"},
+        settlement_days=0,
+    )
+
+
+def test_touch_policy_fills_limit_that_only_touches() -> None:
+    """Default TOUCH policy fills a resting limit when price merely reaches it."""
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
+    orders = [make_order(t0, side="buy", qty="1", limit="100")]
+    bars = [
+        make_bar(t0, "101", "102", "100", "101"),
+        make_bar(t0 + timedelta(minutes=1), "101", "102", "100", "101"),  # low == limit, touch
+    ]
+    sim = Simulator(
+        provider_config=_touch_provider_cfg(), config=SimulatorConfig(min_order_delay_bars=1)
+    )
+    assert len(sim.run(orders, bars).fills) == 1
+
+
+def test_traded_through_policy_skips_touch_only_limit() -> None:
+    """TRADED_THROUGH policy does not fill a limit that price only touches."""
+    from liq.sim.execution import FillPolicy
+
+    t0 = datetime(2024, 1, 1, 9, 30, tzinfo=UTC)
+    orders = [make_order(t0, side="buy", qty="1", limit="100")]
+    bars = [
+        make_bar(t0, "101", "102", "100", "101"),
+        make_bar(t0 + timedelta(minutes=1), "101", "102", "100", "101"),  # never penetrates 100
+    ]
+    sim = Simulator(
+        provider_config=_touch_provider_cfg(),
+        config=SimulatorConfig(min_order_delay_bars=1, fill_policy=FillPolicy.TRADED_THROUGH),
+    )
+    assert len(sim.run(orders, bars).fills) == 0
