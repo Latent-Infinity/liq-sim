@@ -34,7 +34,9 @@ class EVThresholdSelector(ABC):
 class FundingModel(Protocol):
     """Funding model that returns a rate or charge over a time window."""
 
-    def charge(self, notional: float, start_ts: int, end_ts: int) -> float:  # pragma: no cover - protocol
+    def charge(
+        self, notional: float, start_ts: int, end_ts: int
+    ) -> float:  # pragma: no cover - protocol
         """Compute funding charge for a window."""
         ...
 

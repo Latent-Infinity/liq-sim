@@ -90,9 +90,7 @@ def make_stop_sell(symbol: str, ts: datetime, qty: str, stop: str) -> OrderReque
     )
 
 
-def make_stop_limit_buy(
-    symbol: str, ts: datetime, qty: str, stop: str, limit: str
-) -> OrderRequest:
+def make_stop_limit_buy(symbol: str, ts: datetime, qty: str, stop: str, limit: str) -> OrderRequest:
     """Create a stop-limit buy order."""
     return OrderRequest(
         client_order_id=uuid4(),

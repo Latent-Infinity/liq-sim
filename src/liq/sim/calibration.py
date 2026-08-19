@@ -17,13 +17,13 @@ class CalibrationResult:
     params: dict[str, float]
 
 
-
 def _stable_sigmoid(value: float) -> float:
     if value >= 0.0:
         denominator = 1.0 + exp(-value)
         return 1.0 / denominator
     numerator = exp(value)
     return numerator / (1.0 + numerator)
+
 
 def apply_temperature_scale(scores: pl.Series, temperature: float) -> pl.Series:
     """Apply temperature scaling to probability-like scores in logit space."""

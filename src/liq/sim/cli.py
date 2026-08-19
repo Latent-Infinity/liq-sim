@@ -74,7 +74,9 @@ def run_sim(
     result = sim.run(orders, bars)
     _render_equity_curve(result.equity_curve)
     console.print(f"[cyan]Fills:[/cyan] {len(result.fills)}")
-    console.print(f"[cyan]Final equity:[/cyan] {result.equity_curve[-1][1] if result.equity_curve else 'n/a'}")
+    console.print(
+        f"[cyan]Final equity:[/cyan] {result.equity_curve[-1][1] if result.equity_curve else 'n/a'}"
+    )
 
     if checkpoint_out:
         sim.to_checkpoint(backtest_id="cli-run", config_hash="cli").save(checkpoint_out)

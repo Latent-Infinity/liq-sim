@@ -32,7 +32,9 @@ def enforce_pyramiding_limit(current_layers: int, max_layers: int | None) -> boo
     return current_layers < max_layers
 
 
-def enforce_equity_floor(equity: Decimal, floor_pct: float | None, starting_equity: Decimal) -> bool:
+def enforce_equity_floor(
+    equity: Decimal, floor_pct: float | None, starting_equity: Decimal
+) -> bool:
     """Return True if equity is above floor percentage of starting equity."""
     if floor_pct is None:
         return True

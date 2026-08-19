@@ -1,4 +1,3 @@
-
 import pytest
 
 from liq.sim.config import ProviderConfig

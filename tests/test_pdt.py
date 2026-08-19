@@ -50,6 +50,7 @@ def test_pdt_blocks_when_counter_zero() -> None:
     sim.account_state.day_trades_remaining = 0
     # pre-existing long position lot
     from liq.sim.accounting import PositionLot, PositionRecord
+
     sim.account_state.positions["AAPL"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("10"), entry_time=t0)]
     )
@@ -76,6 +77,7 @@ def test_pdt_allows_and_decrements_when_available() -> None:
     t0 = datetime(2024, 1, 1, tzinfo=UTC)
     sim.account_state.day_trades_remaining = 1
     from liq.sim.accounting import PositionLot, PositionRecord
+
     sim.account_state.positions["AAPL"] = PositionRecord(
         lots=[PositionLot(quantity=Decimal("1"), entry_price=Decimal("10"), entry_time=t0)]
     )

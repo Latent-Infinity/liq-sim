@@ -61,7 +61,9 @@ def check_short_permission(
             would_be_short = pre_qty - order.quantity < 0
             if would_be_short:
                 metadata = getattr(order, "metadata", None) or {}
-                locate_ok = bool(metadata.get("locate_available") or metadata.get("locate_borrowed"))
+                locate_ok = bool(
+                    metadata.get("locate_available") or metadata.get("locate_borrowed")
+                )
                 if not locate_ok:
                     raise ConstraintViolation(
                         f"Locate required for short selling {order.symbol}: no locate_available or locate_borrowed in metadata"

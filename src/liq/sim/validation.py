@@ -5,7 +5,9 @@ from datetime import datetime
 from liq.sim.exceptions import IneligibleOrderError, LookAheadBiasError
 
 
-def is_order_eligible(order_bar_index: int, current_bar_index: int, min_delay_bars: int = 1) -> bool:
+def is_order_eligible(
+    order_bar_index: int, current_bar_index: int, min_delay_bars: int = 1
+) -> bool:
     """Return True if the order generated at order_bar_index can execute at current_bar_index."""
     if min_delay_bars < 0:
         raise ValueError("min_delay_bars must be >= 0")

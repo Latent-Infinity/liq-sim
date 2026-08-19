@@ -35,7 +35,11 @@ def convert_to_usd(pnl: Decimal, pair: str, rates: dict[str, Decimal]) -> Decima
     if rate is None:
         logger.warning(
             "FX rate lookup failed for cross pair",
-            extra={"original_pair": pair, "usd_pair": usd_pair, "available_rates": list(rates.keys())},
+            extra={
+                "original_pair": pair,
+                "usd_pair": usd_pair,
+                "available_rates": list(rates.keys()),
+            },
         )
         raise KeyError(f"Missing FX rate for {usd_pair}")
     return pnl / rate

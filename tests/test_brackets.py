@@ -17,7 +17,10 @@ def make_entry(side: OrderSide, qty: str, sl: str | None, tp: str | None) -> Ord
         limit_price=None,
         timestamp=datetime.now(UTC),
         # stash bracket levels in metadata for creation
-        metadata={"stop_loss_price": Decimal(sl) if sl else None, "take_profit_price": Decimal(tp) if tp else None},
+        metadata={
+            "stop_loss_price": Decimal(sl) if sl else None,
+            "take_profit_price": Decimal(tp) if tp else None,
+        },
     )
 
 

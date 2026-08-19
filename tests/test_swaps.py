@@ -40,7 +40,10 @@ def test_swap_applied_at_roll() -> None:
         fee_model="ZeroCommission",
         slippage_model="SpreadBased",
     )
-    sim = Simulator(provider_config=cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000")))
+    sim = Simulator(
+        provider_config=cfg,
+        config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000")),
+    )
 
     t0 = datetime(2024, 1, 1, 21, 59, tzinfo=UTC)
     t1 = datetime(2024, 1, 1, 22, 1, tzinfo=UTC)

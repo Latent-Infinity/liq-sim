@@ -1,4 +1,3 @@
-
 from liq.sim.config import ProviderConfig
 from liq.sim.models.fee import PerShareFee
 from liq.sim.models.spread import SpreadBasedSlippage

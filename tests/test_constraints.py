@@ -81,7 +81,9 @@ def test_margin_rejects_when_required_exceeds_equity() -> None:
         timestamp=portfolio.timestamp,
     )
     with pytest.raises(ConstraintViolation):
-        check_margin(order, portfolio, mark_price=Decimal("100"), initial_margin_rate=Decimal("1.0"))
+        check_margin(
+            order, portfolio, mark_price=Decimal("100"), initial_margin_rate=Decimal("1.0")
+        )
 
 
 def test_pdt_allows_when_none() -> None:

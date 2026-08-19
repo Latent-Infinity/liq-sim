@@ -52,7 +52,9 @@ def test_checkpoint_round_trip(tmp_path: Path) -> None:
         fee_model="ZeroCommission",
         slippage_model="VolumeWeighted",
     )
-    sim_cfg = SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=123)
+    sim_cfg = SimulatorConfig(
+        min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=123
+    )
     sim = Simulator(provider_config=cfg, config=sim_cfg)
     sim.slippage_model = RandomSlippage()
     ts = datetime(2024, 1, 1, tzinfo=UTC)
@@ -109,7 +111,9 @@ def test_deterministic_seed_replay() -> None:
         fee_model="ZeroCommission",
         slippage_model="VolumeWeighted",
     )
-    sim_cfg = SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=999)
+    sim_cfg = SimulatorConfig(
+        min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=999
+    )
     ts = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_order(ts)]
     bars = [make_bar(ts, "10")]
@@ -203,7 +207,9 @@ def test_checkpoint_rng_state_preserved(tmp_path: Path) -> None:
         fee_model="ZeroCommission",
         slippage_model="VolumeWeighted",
     )
-    sim_cfg = SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=42)
+    sim_cfg = SimulatorConfig(
+        min_order_delay_bars=0, initial_capital=Decimal("1000"), random_seed=42
+    )
     sim = Simulator(provider_config=cfg, config=sim_cfg)
 
     # Generate some random values to advance RNG state

@@ -66,7 +66,9 @@ class PositionRecord:
             # Any remaining becomes new short exposure
             if remaining > 0:
                 self.lots.append(
-                    PositionLot(quantity=-remaining, entry_price=fill.price, entry_time=fill.timestamp)
+                    PositionLot(
+                        quantity=-remaining, entry_price=fill.price, entry_time=fill.timestamp
+                    )
                 )
         else:  # buy
             # Close shorts first
@@ -77,7 +79,9 @@ class PositionRecord:
             # Remaining increases long exposure
             if remaining > 0:
                 self.lots.append(
-                    PositionLot(quantity=remaining, entry_price=fill.price, entry_time=fill.timestamp)
+                    PositionLot(
+                        quantity=remaining, entry_price=fill.price, entry_time=fill.timestamp
+                    )
                 )
 
         self.realized_pnl += realized
@@ -165,7 +169,9 @@ class AccountState:
             proceeds = notional_account_ccy - fill.commission
             if settlement_days > 0:
                 release_time = fill.timestamp + timedelta(days=settlement_days)
-                self.settlement_queue.append(SettlementEntry(amount=proceeds, release_time=release_time))
+                self.settlement_queue.append(
+                    SettlementEntry(amount=proceeds, release_time=release_time)
+                )
                 self.unsettled_cash += proceeds
             else:
                 self.cash += proceeds

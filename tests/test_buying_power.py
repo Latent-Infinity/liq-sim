@@ -41,7 +41,10 @@ def test_buying_power_blocks_when_insufficient() -> None:
         slippage_model="VolumeWeighted",
         slippage_params={"base_bps": "0", "volume_impact": "0"},
     )
-    sim = Simulator(provider_config=cfg, config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("0")))
+    sim = Simulator(
+        provider_config=cfg,
+        config=SimulatorConfig(min_order_delay_bars=0, initial_capital=Decimal("0")),
+    )
     t0 = datetime(2024, 1, 1, tzinfo=UTC)
     orders = [make_order(t0, qty="2", price="100")]
     bars = [make_bar(t0, "100")]

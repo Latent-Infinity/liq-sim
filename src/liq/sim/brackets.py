@@ -44,7 +44,9 @@ def create_brackets(entry_fill_price: Decimal, entry_order: OrderRequest) -> Bra
             time_in_force=entry_order.time_in_force,
             timestamp=entry_order.timestamp,
         )
-    return BracketState(stop_loss=stop_loss, take_profit=take_profit, parent_id=str(entry_order.client_order_id))
+    return BracketState(
+        stop_loss=stop_loss, take_profit=take_profit, parent_id=str(entry_order.client_order_id)
+    )
 
 
 def process_brackets(

@@ -20,7 +20,9 @@ def make_order(
         side=OrderSide.BUY,
         order_type=order_type,
         quantity=Decimal(qty),
-        limit_price=Decimal(limit) if limit else (Decimal(price) if order_type == OrderType.LIMIT else None),
+        limit_price=Decimal(limit)
+        if limit
+        else (Decimal(price) if order_type == OrderType.LIMIT else None),
         stop_price=None,
         time_in_force=TimeInForce.DAY,
         timestamp=datetime.now(UTC),

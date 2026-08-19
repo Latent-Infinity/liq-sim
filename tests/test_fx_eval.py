@@ -39,15 +39,9 @@ def test_cvar_from_pnl_tail() -> None:
 def test_tail_stability_and_capacity_metrics() -> None:
     positions = [0.0, 0.1, -0.2, 0.3, -0.1]
     equity = [10000.0, 9900.0, 9950.0, 10050.0, 10100.0]
-    expected_max = max(
-        abs(pos) / eq
-        for pos, eq in zip(positions, equity, strict=False)
-        if eq > 0
-    )
+    expected_max = max(abs(pos) / eq for pos, eq in zip(positions, equity, strict=False) if eq > 0)
     expected_capacity = sum(
-        abs(pos) / eq
-        for pos, eq in zip(positions, equity, strict=False)
-        if eq > 0
+        abs(pos) / eq for pos, eq in zip(positions, equity, strict=False) if eq > 0
     ) / len(positions)
 
     assert max_exposure(positions, equity) == expected_max

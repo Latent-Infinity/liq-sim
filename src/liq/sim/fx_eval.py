@@ -201,7 +201,9 @@ def tail_stability_violations(
     return []
 
 
-def _serialize_trace(kind: str, values: Iterable[float] | None, *, max_length: int) -> dict[str, object]:
+def _serialize_trace(
+    kind: str, values: Iterable[float] | None, *, max_length: int
+) -> dict[str, object]:
     if max_length <= 0:
         raise ValueError("max_length must be positive")
     data = _safe_downsample(_to_floats(values), max_length=max_length)

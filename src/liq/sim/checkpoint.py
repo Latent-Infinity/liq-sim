@@ -213,10 +213,7 @@ def _account_state_to_dict(state: AccountState) -> dict[str, Any]:
     return {
         "cash": str(state.cash),
         "unsettled_cash": str(state.unsettled_cash),
-        "positions": {
-            sym: _position_record_to_dict(rec)
-            for sym, rec in state.positions.items()
-        },
+        "positions": {sym: _position_record_to_dict(rec) for sym, rec in state.positions.items()},
         "settlement_queue": [_settlement_entry_to_dict(e) for e in state.settlement_queue],
         "day_trades_remaining": state.day_trades_remaining,
         "account_currency": state.account_currency,
@@ -227,10 +224,7 @@ def _dict_to_account_state(data: dict[str, Any]) -> AccountState:
     """Restore AccountState from dict."""
     state = AccountState(cash=Decimal(data["cash"]))
     state.unsettled_cash = Decimal(data["unsettled_cash"])
-    state.positions = {
-        sym: _dict_to_position_record(rec)
-        for sym, rec in data["positions"].items()
-    }
+    state.positions = {sym: _dict_to_position_record(rec) for sym, rec in data["positions"].items()}
     state.settlement_queue = [_dict_to_settlement_entry(e) for e in data["settlement_queue"]]
     state.day_trades_remaining = data["day_trades_remaining"]
     state.account_currency = data["account_currency"]
